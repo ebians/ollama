@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社内RAGアシスタント</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Meiryo', sans-serif; background: #f0f2f5; color: #1a1a1a; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        header {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            color: #fff; padding: 24px 32px; border-radius: 12px; margin-bottom: 24px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        header h1 { font-size: 1.4rem; }
+        #stats { font-size: 0.85rem; opacity: 0.85; }
+
+        .card {
+            background: #fff; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 20px;
+        }
+        .card h2 { font-size: 1.05rem; margin-bottom: 14px; color: #374151; }
+
+        /* Upload */
+        .upload-area {
+            border: 2px dashed #cbd5e1; border-radius: 8px; padding: 28px;
+            text-align: center; cursor: pointer; transition: border-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.drag-over { border-color: #2563eb; background: #eff6ff; }
+        .upload-area input[type="file"] { display: none; }
+        .upload-area p { color: #64748b; font-size: 0.95rem; }
+        #upload-status { margin-top: 10px; font-size: 0.9rem; color: #16a34a; }
+
+        /* Chat */
+        #chat-log {
+            max-height: 440px; overflow-y: auto; margin-bottom: 14px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .msg { padding: 12px 16px; border-radius: 10px; max-width: 85%; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; }
+        .msg.user { background: #2563eb; color: #fff; align-self: flex-end; }
+        .msg.assistant { background: #f1f5f9; align-self: flex-start; }
+        .msg .sources { margin-top: 8px; font-size: 0.8rem; color: #6b7280; }
+
+        .input-row { display: flex; gap: 8px; }
+        .input-row input {
+            flex: 1; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 1rem; outline: none;
+        }
+        .input-row input:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+        button {
+            padding: 10px 22px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 0.95rem; font-weight: 600; transition: background 0.2s;
+        }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+        .btn-danger { background: #ef4444; color: #fff; font-size: 0.8rem; padding: 6px 14px; }
+        .btn-danger:hover { background: #dc2626; }
+
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #93c5fd; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1>📚 社内RAGアシスタント</h1>
+            <small>Ollama + ChromaDB</small>
+        </div>
+        <div style="text-align:right">
+            <div id="stats">読み込み中...</div>
+            <button class="btn-danger" onclick="resetDB()" style="margin-top:6px">DB リセット</button>
+        </div>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="card">
+        <h2>📄 ドキュメントをアップロード</h2>
+        <div class="upload-area" id="drop-zone">
+            <p>ここにファイルをドラッグ＆ドロップ<br>またはクリックして選択<br><small>対応形式: .txt / .pdf / .docx</small></p>
+            <input type="file" id="file-input" accept=".txt,.pdf,.docx" multiple>
+        </div>
+        <div id="upload-status"></div>
+    </div>
+
+    <!-- Chat Card -->
+    <div class="card">
+        <h2>💬 質問する</h2>
+        <div id="chat-log"></div>
+        <div class="input-row">
+            <input type="text" id="question" placeholder="社内ドキュメントについて質問..." autocomplete="off">
+            <button class="btn-primary" id="ask-btn" onclick="ask()">送信</button>
+        </div>
+    </div>
+
+    <footer>Powered by Ollama (qwen2.5:7b) + ChromaDB</footer>
+</div>
+
+<script>
+const chatLog = document.getElementById('chat-log');
+const questionInput = document.getElementById('question');
+const askBtn = document.getElementById('ask-btn');
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const uploadStatus = document.getElementById('upload-status');
+const statsEl = document.getElementById('stats');
+
+// ---------- Stats ----------
+async function loadStats() {
+    try {
+        const r = await fetch('/api/stats');
+        const d = await r.json();
+        statsEl.textContent = `登録チャンク数: ${d.total_chunks}`;
+    } catch { statsEl.textContent = '接続エラー'; }
+}
+loadStats();
+
+// ---------- Upload ----------
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+async function handleFiles(files) {
+    for (const file of files) {
+        uploadStatus.textContent = `⏳ アップロード中: ${file.name}...`;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+            const r = await fetch('/api/upload', { method: 'POST', body: form });
+            const d = await r.json();
+            uploadStatus.textContent = `✅ ${d.filename} — ${d.chunks} チャンクに分割して登録`;
+        } catch (e) {
+            uploadStatus.textContent = `❌ アップロード失敗: ${e.message}`;
+        }
+    }
+    loadStats();
+}
+
+// ---------- Chat ----------
+questionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) ask(); });
+
+async function ask() {
+    const q = questionInput.value.trim();
+    if (!q) return;
+    questionInput.value = '';
+    appendMsg('user', q);
+    askBtn.disabled = true;
+    const loadingEl = appendMsg('assistant', '');
+    loadingEl.innerHTML = '<span class="spinner"></span> 考え中...';
+
+    try {
+        const r = await fetch('/api/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: q }),
+        });
+        const d = await r.json();
+        let html = escapeHtml(d.answer);
+        if (d.sources && d.sources.length) {
+            html += '\n<div class="sources">📎 参照: ' +
+                d.sources.map(s => `${escapeHtml(s.source)} (距離: ${s.distance})`).join(', ') +
+                '</div>';
+        }
+        loadingEl.innerHTML = html;
+    } catch (e) {
+        loadingEl.textContent = `❌ エラー: ${e.message}`;
+    }
+    askBtn.disabled = false;
+    questionInput.focus();
+}
+
+function appendMsg(role, text) {
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return div;
+}
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// ---------- Reset ----------
+async function resetDB() {
+    if (!confirm('全ドキュメントを削除しますか？')) return;
+    await fetch('/api/reset', { method: 'POST' });
+    chatLog.innerHTML = '';
+    loadStats();
+    uploadStatus.textContent = 'DB をリセットしました';
+}
+</script>
+</body>
+</html>
