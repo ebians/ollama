@@ -60,6 +60,16 @@
         .btn-danger { background: #ef4444; color: #fff; font-size: 0.8rem; padding: 6px 14px; }
         .btn-danger:hover { background: #dc2626; }
 
+        /* Mode selector */
+        .mode-selector { display: flex; gap: 6px; margin-bottom: 12px; }
+        .mode-btn {
+            padding: 6px 14px; border: 2px solid #e2e8f0; border-radius: 20px;
+            background: #fff; color: #64748b; font-size: 0.85rem; font-weight: 500;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .mode-btn:hover { border-color: #94a3b8; color: #334155; }
+        .mode-btn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #93c5fd; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -92,6 +102,11 @@
     <!-- Chat Card -->
     <div class="card">
         <h2>💬 質問する</h2>
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="rag" onclick="setMode('rag', this)">📄 RAGモード</button>
+            <button class="mode-btn" data-mode="hybrid" onclick="setMode('hybrid', this)">🔀 ハイブリッド</button>
+            <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリーチャット</button>
+        </div>
         <div id="chat-log"></div>
         <div class="input-row">
             <input type="text" id="question" placeholder="社内ドキュメントについて質問..." autocomplete="off">
@@ -110,6 +125,21 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const uploadStatus = document.getElementById('upload-status');
 const statsEl = document.getElementById('stats');
+
+let chatHistory = []; // 会話履歴 [{role, content}, ...]
+let currentMode = 'rag';
+
+function setMode(mode, btn) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const placeholders = {
+        rag: '社内ドキュメントについて質問...',
+        hybrid: '社内文書 + 一般知識で回答...',
+        free: '何でも質問してください...'
+    };
+    questionInput.placeholder = placeholders[mode] || placeholders.rag;
+}
 
 // ---------- Stats ----------
 async function loadStats() {
@@ -160,19 +190,55 @@ async function ask() {
     loadingEl.innerHTML = '<span class="spinner"></span> 考え中...';
 
     try {
-        const r = await fetch('/api/ask', {
+        const r = await fetch('/api/ask/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: q }),
+            body: JSON.stringify({ question: q, history: chatHistory, mode: currentMode }),
         });
-        const d = await r.json();
-        let html = escapeHtml(d.answer);
-        if (d.sources && d.sources.length) {
-            html += '\n<div class="sources">📎 参照: ' +
-                d.sources.map(s => `${escapeHtml(s.source)} (距離: ${s.distance})`).join(', ') +
-                '</div>';
+
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let fullAnswer = '';
+        let sources = [];
+        let buffer = '';
+        loadingEl.textContent = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // keep incomplete line
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const payload = line.slice(6);
+                if (payload === '[DONE]') break;
+                try {
+                    const msg = JSON.parse(payload);
+                    if (msg.type === 'sources') {
+                        sources = msg.sources || [];
+                    } else if (msg.type === 'token') {
+                        fullAnswer += msg.token;
+                        loadingEl.textContent = fullAnswer;
+                        chatLog.scrollTop = chatLog.scrollHeight;
+                    }
+                } catch {}
+            }
         }
-        loadingEl.innerHTML = html;
+
+        // 履歴に追加（最新10往復まで保持）
+        chatHistory.push({ role: 'user', content: q });
+        chatHistory.push({ role: 'assistant', content: fullAnswer });
+        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+        // ソース情報を追記
+        if (sources.length) {
+            let html = escapeHtml(fullAnswer);
+            html += '\n<div class="sources">📎 参照: ' +
+                sources.map(s => `${escapeHtml(s.source)} (距離: ${s.distance})`).join(', ') +
+                '</div>';
+            loadingEl.innerHTML = html;
+        }
     } catch (e) {
         loadingEl.textContent = `❌ エラー: ${e.message}`;
     }
@@ -200,6 +266,7 @@ async function resetDB() {
     if (!confirm('全ドキュメントを削除しますか？')) return;
     await fetch('/api/reset', { method: 'POST' });
     chatLog.innerHTML = '';
+    chatHistory = [];
     loadStats();
     uploadStatus.textContent = 'DB をリセットしました';
 }

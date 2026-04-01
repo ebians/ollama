@@ -1,0 +1,20 @@
+# 社内RAGアシスタント用 Caddyfile
+#
+# 使い方:
+#   開発: caddy run --config Caddyfile
+#   本番: caddy start --config Caddyfile
+#
+# ローカル開発用（HTTP, ポート80 → Uvicorn:8000）
+:80 {
+	# SSE ストリーミング対応（バッファリング無効化）
+	reverse_proxy localhost:8000 {
+		flush_interval -1
+	}
+}
+
+# --- 社内サーバー公開用（以下をコメント解除して使用）---
+# rag.example.com {
+# 	reverse_proxy localhost:8000 {
+# 		flush_interval -1
+# 	}
+# }
