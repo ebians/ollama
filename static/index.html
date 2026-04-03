@@ -74,6 +74,23 @@
         .msg.assistant th { background: #e2e8f0; }
         .msg.assistant h1, .msg.assistant h2, .msg.assistant h3 { margin: 0.5em 0 0.2em; font-size: 1em; }
         .msg .sources { margin-top: 8px; font-size: 0.8rem; color: #6b7280; }
+        .msg .msg-actions {
+            display: flex; gap: 6px; margin-top: 6px;
+        }
+        .msg .msg-actions button {
+            padding: 2px 8px; font-size: 0.75rem; font-weight: 400; background: #e2e8f0;
+            color: #475569; border: none; border-radius: 4px; cursor: pointer; transition: background 0.15s;
+        }
+        .msg .msg-actions button:hover { background: #cbd5e1; }
+        .msg .msg-actions button.copied { background: #22c55e; color: #fff; }
+
+        /* Export button */
+        .btn-export {
+            padding: 4px 10px; background: rgba(255,255,255,0.15); color: #fff;
+            border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem; font-weight: 400;
+        }
+        .btn-export:hover { background: rgba(255,255,255,0.25); }
 
         .input-row { display: flex; gap: 8px; }
         .input-row input {
@@ -214,6 +231,8 @@
         [data-theme="dark"] .pw-card { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
         [data-theme="dark"] .pw-card h3 { color: #e2e8f0; }
         [data-theme="dark"] .pw-card input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .msg .msg-actions button { background: #334155; color: #94a3b8; }
+        [data-theme="dark"] .msg .msg-actions button:hover { background: #475569; }
         [data-theme="dark"] .btn-cancel { background: #334155; color: #e2e8f0; }
         [data-theme="dark"] footer { color: #475569; }
     </style>
@@ -251,6 +270,7 @@
             <div class="user-info" id="user-info" style="display:none; margin-top:4px; justify-content:flex-end;">
                 <span class="username" id="user-display"></span>
                 <button class="pw-btn" onclick="showPasswordModal()">PW変更</button>
+                <button class="btn-export" onclick="exportChat()" id="export-btn" style="display:none">⬇ エクスポート</button>
                 <button class="logout-btn" onclick="doLogout()">ログアウト</button>
             </div>
             <a href="/admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px" id="admin-link" class="hidden">管理画面</a>
@@ -536,13 +556,34 @@ async function ask() {
                 sources.map(s => `${escapeHtml(s.source)} (距離: ${s.distance})`).join(', ') +
                 '</div>';
         }
+        html += `<div class="msg-actions"><button onclick="copyMsg(this, '${btoa(encodeURIComponent(fullAnswer))}')">📋 コピー</button></div>`;
         loadingEl.innerHTML = html;
+        updateExportBtn();
         loadSessions();  // サイドバー更新
     } catch (e) {
         loadingEl.textContent = `❌ エラー: ${e.message}`;
     }
     askBtn.disabled = false;
     questionInput.focus();
+}
+
+function copyMsg(btn, encodedText) {
+    const text = decodeURIComponent(atob(encodedText));
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✅ コピー済み';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '📋 コピー'; btn.classList.remove('copied'); }, 2000);
+    });
+}
+
+function updateExportBtn() {
+    const btn = document.getElementById('export-btn');
+    btn.style.display = currentSessionId ? 'inline-block' : 'none';
+}
+
+function exportChat() {
+    if (!currentSessionId) return;
+    window.open(`/api/sessions/${currentSessionId}/export`, '_blank');
 }
 
 function appendMsg(role, text) {
@@ -608,11 +649,13 @@ async function loadSession(sessionId) {
                         msg.sources.map(s => `${escapeHtml(s.source)} (距離: ${s.distance})`).join(', ') +
                         '</div>';
                 }
+                html += `<div class="msg-actions"><button onclick="copyMsg(this, '${btoa(encodeURIComponent(msg.content))}')">📋 コピー</button></div>`;
                 el.innerHTML = html;
                 chatHistory.push({ role: 'assistant', content: msg.content });
             }
         }
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+        updateExportBtn();
         loadSessions();
     } catch {}
 }
@@ -621,6 +664,7 @@ function newSession() {
     currentSessionId = '';
     chatHistory = [];
     chatLog.innerHTML = '';
+    updateExportBtn();
     loadSessions();
 }
 

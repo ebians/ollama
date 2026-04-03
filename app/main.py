@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from app.config import ADMIN_PASSWORD
 from app.ollama_client import chat_completion, chat_completion_stream, list_models
+from app.rate_limit import check_rate_limit
+from app.audit_log import add_usage_log, get_usage_logs, get_usage_stats
 from app.parser import extract_text, SUPPORTED_EXTENSIONS
 from app.vectorstore import add_document, search, get_stats, reset_db, list_documents, delete_document, get_document_chunks
 from app.chat_store import (
@@ -230,8 +232,16 @@ async def ask_question(req: AskRequest):
 @app.post("/api/ask/stream")
 async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_current_user)):
     """ストリーミング回答（SSE、モード対応、履歴保存）"""
+    # レート制限
+    user_id = user["id"] if user else "anonymous"
+    if not check_rate_limit(user_id):
+        raise HTTPException(status_code=429, detail="リクエスト回数の上限に達しました。しばらくお待ちください。")
+
+    # 利用ログ記録
+    username = user["username"] if user else "anonymous"
+    add_usage_log(user_id, username, req.question, req.mode, req.model)
+
     # セッション管理
-    user_id = user["id"] if user else ""
     session_id = req.session_id or create_session(req.question[:50], req.mode, user_id)
     add_message(session_id, "user", req.question)
 
@@ -313,6 +323,34 @@ async def remove_session(session_id: str, user: dict | None = Depends(get_curren
     """セッションを削除する"""
     delete_session(session_id)
     return {"status": "ok"}
+
+
+@app.get("/api/sessions/{session_id}/export")
+async def export_session(session_id: str, user: dict | None = Depends(get_current_user)):
+    """セッションをMarkdown形式でエクスポートする"""
+    messages = get_messages(session_id)
+    if not messages:
+        raise HTTPException(status_code=404, detail="セッションが見つかりません")
+    lines = []
+    for msg in messages:
+        if msg["role"] == "user":
+            lines.append(f"**あなた:**\n{msg['content']}")
+        else:
+            lines.append(f"**アシスタント:**\n{msg['content']}")
+    md = "\n\n---\n\n".join(lines)
+    return Response(
+        content=md,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="chat-{session_id}.md"'},
+    )
+
+
+# ---------- 利用ログ API（管理者のみ）----------
+
+@app.get("/api/usage-logs")
+async def api_usage_logs(limit: int = 100, offset: int = 0, _admin: dict = Depends(require_admin_user)):
+    """利用ログを返す（管理者のみ）"""
+    return {"logs": get_usage_logs(limit, offset), "stats": get_usage_stats()}
 
 
 # ---------- Static / Frontend ----------

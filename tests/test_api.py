@@ -12,6 +12,11 @@ _ADMIN_USER = {"id": "admin001", "username": "admin", "display_name": "管理者
 _NORMAL_USER = {"id": "user001", "username": "testuser", "display_name": "テスト", "is_admin": False}
 
 
+async def _mock_stream(text):
+    """テスト用: chat_completion_stream のモック"""
+    yield text
+
+
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)
@@ -273,3 +278,61 @@ class TestStaticPages:
         r = await client.get("/admin")
         assert r.status_code == 200
         assert "管理" in r.text
+
+
+class TestRateLimit:
+    async def test_rate_limit_429(self, client, as_user):
+        """レート制限超過で429"""
+        from app.rate_limit import reset_rate_limit, _requests
+        from app.config import RATE_LIMIT_PER_MINUTE
+        import time
+        reset_rate_limit()
+        # 上限まで埋める
+        _requests["user001"] = [time.time()] * RATE_LIMIT_PER_MINUTE
+        with patch("app.main.search", new_callable=AsyncMock, return_value=[]):
+            r = await client.post("/api/ask/stream", json={"question": "test", "mode": "free"})
+        assert r.status_code == 429
+        reset_rate_limit()
+
+    async def test_rate_limit_ok(self, client, as_user):
+        """レート制限内なら通過"""
+        from app.rate_limit import reset_rate_limit
+        reset_rate_limit()
+        with patch("app.main.chat_completion_stream", return_value=_mock_stream("ok")):
+            r = await client.post("/api/ask/stream", json={"question": "test", "mode": "free"})
+        assert r.status_code == 200
+        reset_rate_limit()
+
+
+class TestUsageLogs:
+    async def test_get_logs_as_admin(self, client, as_admin):
+        r = await client.get("/api/usage-logs")
+        assert r.status_code == 200
+        data = r.json()
+        assert "logs" in data
+        assert "stats" in data
+
+    async def test_get_logs_as_user(self, client, as_user):
+        r = await client.get("/api/usage-logs")
+        assert r.status_code == 403
+
+    async def test_get_logs_no_auth(self, client):
+        r = await client.get("/api/usage-logs")
+        assert r.status_code == 401
+
+
+class TestChatExport:
+    async def test_export_session(self, client, as_user):
+        from app.chat_store import create_session, add_message
+        sid = create_session("テスト", "rag", "user001")
+        add_message(sid, "user", "テスト質問")
+        add_message(sid, "assistant", "テスト回答")
+        r = await client.get(f"/api/sessions/{sid}/export")
+        assert r.status_code == 200
+        assert "テスト質問" in r.text
+        assert "テスト回答" in r.text
+        assert "text/markdown" in r.headers["content-type"]
+
+    async def test_export_nonexistent(self, client, as_user):
+        r = await client.get("/api/sessions/nonexistent123/export")
+        assert r.status_code == 404

@@ -68,6 +68,12 @@
         .doc-filter:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
         .doc-filter-count { font-size: 0.8rem; color: #64748b; margin-bottom: 8px; }
 
+        /* Usage log */
+        .log-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .log-controls button { font-weight: 400; }
+        .log-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 0.85rem; color: #64748b; }
+        .log-stats strong { color: #1e293b; }
+
         footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
 
         /* Login overlay */
@@ -210,6 +216,8 @@
         [data-theme="dark"] .doc-filter { background: #0f172a; border-color: #334155; color: #e2e8f0; }
         [data-theme="dark"] .doc-filter:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.3); }
         [data-theme="dark"] .doc-filter-count { color: #94a3b8; }
+        [data-theme="dark"] .log-stats { color: #94a3b8; }
+        [data-theme="dark"] .log-stats strong { color: #e2e8f0; }
         [data-theme="dark"] footer { color: #475569; }
     </style>
 </head>
@@ -253,6 +261,14 @@
         <div class="stat-item">
             <div class="num" id="stat-chunks">-</div>
             <div class="label">チャンク数</div>
+        </div>
+        <div class="stat-item">
+            <div class="num" id="stat-questions">-</div>
+            <div class="label">総質問数</div>
+        </div>
+        <div class="stat-item">
+            <div class="num" id="stat-today">-</div>
+            <div class="label">今日の質問</div>
         </div>
         <div class="stat-item">
             <div class="num" id="stat-users">-</div>
@@ -306,6 +322,17 @@
         </div>
         <div class="user-msg" id="user-msg"></div>
         <div id="user-list"></div>
+    </div>
+
+    <!-- Usage Log Card -->
+    <div class="card">
+        <h2>📊 利用ログ</h2>
+        <div class="log-stats" id="log-stats"></div>
+        <div class="log-controls">
+            <button class="btn-preview" onclick="loadLogs(0)">最新</button>
+            <button class="btn-preview" onclick="loadLogs(logOffset + 50)">次の50件</button>
+        </div>
+        <div id="log-list"></div>
     </div>
 
     <footer>管理者専用画面 — 認証が必要です</footer>
@@ -419,8 +446,9 @@ async function loadData() {
     document.getElementById('doc-filter-count').textContent = '';
     renderDocs(docs);
 
-    // Load users
+    // Load users and logs
     loadUsers();
+    loadLogs();
 }
 
 function renderDocs(docs) {
@@ -659,6 +687,43 @@ function toggleTheme() {
         document.getElementById('theme-toggle').textContent = '☀️';
     }
 })();
+
+// ---------- Usage Log ----------
+let logOffset = 0;
+
+async function loadLogs(offset = 0) {
+    logOffset = offset;
+    const r = await authFetch(`/api/usage-logs?limit=50&offset=${offset}`);
+    if (!r) return;
+    const data = await r.json();
+
+    // stats
+    const s = data.stats || {};
+    document.getElementById('stat-questions').textContent = s.total_questions || 0;
+    document.getElementById('stat-today').textContent = s.today_questions || 0;
+    const statsEl = document.getElementById('log-stats');
+    statsEl.innerHTML = `<span>総質問数: <strong>${s.total_questions || 0}</strong></span> <span>本日: <strong>${s.today_questions || 0}</strong></span>`;
+
+    const logs = data.logs || [];
+    const listEl = document.getElementById('log-list');
+    if (logs.length === 0) {
+        listEl.innerHTML = '<div class="doc-empty">ログがありません</div>';
+        return;
+    }
+    let html = '<table class="doc-table"><thead><tr><th>日時</th><th>ユーザー</th><th>モード</th><th>質問</th></tr></thead><tbody>';
+    for (const log of logs) {
+        const time = log.created_at ? log.created_at.slice(0, 16).replace('T', ' ') : '';
+        const q = escapeHtml(log.question.length > 60 ? log.question.slice(0, 60) + '…' : log.question);
+        html += `<tr>
+            <td style="font-size:0.8rem;color:#64748b;white-space:nowrap">${time}</td>
+            <td>${escapeHtml(log.username)}</td>
+            <td style="font-size:0.8rem">${escapeHtml(log.mode)}</td>
+            <td title="${escapeHtml(log.question)}">${q}</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+}
 
 // ---------- Init ----------
 checkAuth();
