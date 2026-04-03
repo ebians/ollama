@@ -60,6 +60,14 @@
         .btn-preview:hover { background: #1d4ed8; }
         .btn-reset { margin-top: 16px; }
 
+        /* Doc filter */
+        .doc-filter {
+            width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 0.9rem; outline: none; margin-bottom: 14px;
+        }
+        .doc-filter:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+        .doc-filter-count { font-size: 0.8rem; color: #64748b; margin-bottom: 8px; }
+
         footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
 
         /* Login overlay */
@@ -199,6 +207,9 @@
         [data-theme="dark"] .user-form .field input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
         [data-theme="dark"] .user-form .field input:focus { border-color: #2563eb; }
         [data-theme="dark"] .user-form .field select { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .doc-filter { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .doc-filter:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.3); }
+        [data-theme="dark"] .doc-filter-count { color: #94a3b8; }
         [data-theme="dark"] footer { color: #475569; }
     </style>
 </head>
@@ -262,6 +273,8 @@
     <!-- Document List Card -->
     <div class="card">
         <h2>📋 登録済みドキュメント</h2>
+        <input type="text" class="doc-filter" id="doc-filter" placeholder="🔍 ファイル名で検索..." oninput="filterDocs()">
+        <div class="doc-filter-count" id="doc-filter-count"></div>
         <div id="doc-list"></div>
         <button class="btn-danger btn-reset" onclick="resetAll()">⚠ 全ドキュメント削除</button>
     </div>
@@ -316,6 +329,8 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const uploadStatus = document.getElementById('upload-status');
 const docListEl = document.getElementById('doc-list');
+
+let allDocs = []; // フィルタ用に全ドキュメントを保持
 
 // ---------- Auth ----------
 async function checkAuth() {
@@ -398,28 +413,47 @@ async function loadData() {
     const r = await authFetch('/api/documents');
     if (!r) return;
     const docs = await r.json();
+    allDocs = docs;
     document.getElementById('stat-docs').textContent = docs.length;
-
-    if (docs.length === 0) {
-        docListEl.innerHTML = '<div class="doc-empty">ドキュメントが登録されていません</div>';
-    } else {
-        let html = '<table class="doc-table"><thead><tr><th>ファイル名</th><th>チャンク数</th><th></th></tr></thead><tbody>';
-        for (const doc of docs) {
-            html += `<tr>
-                <td>${escapeHtml(doc.source)}</td>
-                <td>${doc.chunks}</td>
-                <td>
-                    <button class="btn-preview" onclick="previewChunks('${escapeAttr(doc.source)}')">プレビュー</button>
-                    <button class="btn-danger-outline" onclick="deleteDoc('${escapeAttr(doc.source)}')">削除</button>
-                </td>
-            </tr>`;
-        }
-        html += '</tbody></table>';
-        docListEl.innerHTML = html;
-    }
+    document.getElementById('doc-filter').value = '';
+    document.getElementById('doc-filter-count').textContent = '';
+    renderDocs(docs);
 
     // Load users
     loadUsers();
+}
+
+function renderDocs(docs) {
+    if (docs.length === 0) {
+        docListEl.innerHTML = '<div class="doc-empty">ドキュメントが登録されていません</div>';
+        return;
+    }
+    let html = '<table class="doc-table"><thead><tr><th>ファイル名</th><th>チャンク数</th><th></th></tr></thead><tbody>';
+    for (const doc of docs) {
+        html += `<tr>
+            <td>${escapeHtml(doc.source)}</td>
+            <td>${doc.chunks}</td>
+            <td>
+                <button class="btn-preview" onclick="previewChunks('${escapeAttr(doc.source)}')">プレビュー</button>
+                <button class="btn-danger-outline" onclick="deleteDoc('${escapeAttr(doc.source)}')">削除</button>
+            </td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    docListEl.innerHTML = html;
+}
+
+function filterDocs() {
+    const q = document.getElementById('doc-filter').value.trim().toLowerCase();
+    const countEl = document.getElementById('doc-filter-count');
+    if (!q) {
+        renderDocs(allDocs);
+        countEl.textContent = '';
+        return;
+    }
+    const filtered = allDocs.filter(d => d.source.toLowerCase().includes(q));
+    renderDocs(filtered);
+    countEl.textContent = `${allDocs.length} 件中 ${filtered.length} 件表示`;
 }
 
 // ---------- Upload ----------
