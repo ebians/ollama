@@ -175,6 +175,57 @@ class TestUserManagement:
             assert r.status_code == 200
 
 
+class TestModels:
+    @patch("app.main.list_models", new_callable=AsyncMock, return_value=[
+        {"name": "qwen2.5:7b", "size": 5000000000, "modified_at": "2025-01-01"},
+        {"name": "llama3:8b", "size": 4500000000, "modified_at": "2025-01-02"},
+    ])
+    async def test_list_models(self, mock_models, client):
+        r = await client.get("/api/models")
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 2
+        assert data[0]["name"] == "qwen2.5:7b"
+
+    @patch("app.main.list_models", new_callable=AsyncMock, side_effect=Exception("connection error"))
+    async def test_list_models_error(self, mock_models, client):
+        r = await client.get("/api/models")
+        assert r.status_code == 200
+        assert r.json() == []
+
+    async def test_stats_includes_default_model(self, client):
+        r = await client.get("/api/stats")
+        assert r.status_code == 200
+        data = r.json()
+        assert "default_model" in data
+
+
+class TestChunkPreview:
+    @patch("app.main.get_document_chunks", return_value=[
+        {"id": "abc_chunk0", "chunk_index": 0, "text": "テスト内容", "length": 5},
+    ])
+    async def test_get_chunks(self, mock_chunks, client, as_admin):
+        r = await client.get("/api/documents/test.pdf/chunks")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["source"] == "test.pdf"
+        assert len(data["chunks"]) == 1
+        assert data["chunks"][0]["text"] == "テスト内容"
+
+    @patch("app.main.get_document_chunks", return_value=[])
+    async def test_get_chunks_not_found(self, mock_chunks, client, as_admin):
+        r = await client.get("/api/documents/notexist.pdf/chunks")
+        assert r.status_code == 404
+
+    async def test_get_chunks_no_auth(self, client):
+        r = await client.get("/api/documents/test.pdf/chunks")
+        assert r.status_code == 401
+
+    async def test_get_chunks_non_admin(self, client, as_user):
+        r = await client.get("/api/documents/test.pdf/chunks")
+        assert r.status_code == 403
+
+
 class TestStaticPages:
     async def test_index(self, client):
         r = await client.get("/")

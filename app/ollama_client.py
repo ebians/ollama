@@ -44,6 +44,22 @@ def _build_messages(
     return messages
 
 
+async def list_models() -> list[dict]:
+    """Ollamaに登録されているモデル一覧を返す"""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        return [
+            {
+                "name": m["name"],
+                "size": m.get("size", 0),
+                "modified_at": m.get("modified_at", ""),
+            }
+            for m in models
+        ]
+
+
 async def get_embedding(text: str) -> list[float]:
     """Ollamaのembedding APIでテキストをベクトル化する"""
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -60,14 +76,16 @@ async def chat_completion(
     context: str | None = None,
     history: list[dict] | None = None,
     mode: str = "rag",
+    model: str = "",
 ) -> str:
     """Ollamaのチャット補完 API を呼び出す"""
     messages = _build_messages(prompt, context, history, mode)
+    use_model = model or CHAT_MODEL
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             f"{OLLAMA_BASE_URL}/api/chat",
             json={
-                "model": CHAT_MODEL,
+                "model": use_model,
                 "messages": messages,
                 "stream": False,
             },
@@ -81,15 +99,17 @@ async def chat_completion_stream(
     context: str | None = None,
     history: list[dict] | None = None,
     mode: str = "rag",
+    model: str = "",
 ) -> AsyncIterator[str]:
     """ストリーミングでチャット補完 API を呼び出す"""
     messages = _build_messages(prompt, context, history, mode)
+    use_model = model or CHAT_MODEL
     async with httpx.AsyncClient(timeout=300.0) as client:
         async with client.stream(
             "POST",
             f"{OLLAMA_BASE_URL}/api/chat",
             json={
-                "model": CHAT_MODEL,
+                "model": use_model,
                 "messages": messages,
                 "stream": True,
             },

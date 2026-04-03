@@ -9,9 +9,9 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.config import ADMIN_PASSWORD
-from app.ollama_client import chat_completion, chat_completion_stream
+from app.ollama_client import chat_completion, chat_completion_stream, list_models
 from app.parser import extract_text, SUPPORTED_EXTENSIONS
-from app.vectorstore import add_document, search, get_stats, reset_db, list_documents, delete_document
+from app.vectorstore import add_document, search, get_stats, reset_db, list_documents, delete_document, get_document_chunks
 from app.chat_store import (
     create_session, add_message, get_sessions, get_messages, delete_session,
 )
@@ -65,6 +65,7 @@ class AskRequest(BaseModel):
     history: list[dict] = []
     mode: str = "rag"  # "rag" | "hybrid" | "free"
     session_id: str = ""  # 空なら新規セッション
+    model: str = ""  # 空ならデフォルトモデル
 
 
 class AskResponse(BaseModel):
@@ -166,6 +167,15 @@ async def remove_document(source: str, _admin: dict = Depends(require_admin_user
     return {"source": source, "deleted_chunks": deleted}
 
 
+@app.get("/api/documents/{source:path}/chunks")
+async def get_chunks(source: str, _admin: dict = Depends(require_admin_user)):
+    """指定ドキュメントのチャンク一覧を返す（管理者専用）"""
+    chunks = get_document_chunks(source)
+    if not chunks:
+        raise HTTPException(status_code=404, detail="ドキュメントが見つかりません")
+    return {"source": source, "chunks": chunks}
+
+
 @app.post("/api/reset")
 async def reset(_admin: dict = Depends(require_admin_user)):
     """ドキュメントを全削除する（管理者専用）"""
@@ -184,7 +194,7 @@ async def ask_question(req: AskRequest):
             return AskResponse(answer="ドキュメントが登録されていません。先にファイルをアップロードしてください。", sources=[])
         if hits:
             context = "\n\n---\n\n".join(h["text"] for h in hits)
-    answer = await chat_completion(req.question, context, req.history, req.mode)
+    answer = await chat_completion(req.question, context, req.history, req.mode, req.model)
     return AskResponse(answer=answer, sources=hits)
 
 
@@ -222,7 +232,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
         data = json.dumps({"type": "sources", "sources": hits}, ensure_ascii=False)
         yield f"data: {data}\n\n"
         full_answer = ""
-        async for token in chat_completion_stream(req.question, context, req.history, req.mode):
+        async for token in chat_completion_stream(req.question, context, req.history, req.mode, req.model):
             full_answer += token
             data = json.dumps({"type": "token", "token": token}, ensure_ascii=False)
             yield f"data: {data}\n\n"
@@ -235,8 +245,20 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
 
 @app.get("/api/stats")
 async def stats():
-    """DB統計を返す"""
-    return get_stats()
+    """デフォルトモデル名とDB統計を返す"""
+    from app.config import CHAT_MODEL
+    s = get_stats()
+    s["default_model"] = CHAT_MODEL
+    return s
+
+
+@app.get("/api/models")
+async def api_list_models():
+    """利用可能なOllamaモデル一覧を返す"""
+    try:
+        return await list_models()
+    except Exception:
+        return []
 
 
 # ---------- チャット履歴 API ----------

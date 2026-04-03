@@ -117,6 +117,24 @@ def list_documents() -> list[dict]:
     return [{"source": src, "chunks": cnt} for src, cnt in sorted(doc_map.items())]
 
 
+def get_document_chunks(source: str) -> list[dict]:
+    """指定ドキュメントのチャンク一覧を返す"""
+    if _collection.count() == 0:
+        return []
+    all_data = _collection.get(include=["metadatas", "documents"])
+    chunks = []
+    for id_, meta, doc in zip(all_data["ids"], all_data["metadatas"], all_data["documents"]):
+        if meta.get("source") == source:
+            chunks.append({
+                "id": id_,
+                "chunk_index": meta.get("chunk_index", 0),
+                "text": doc,
+                "length": len(doc),
+            })
+    chunks.sort(key=lambda c: c["chunk_index"])
+    return chunks
+
+
 def delete_document(source: str) -> int:
     """指定ソース名のチャンクを全て削除する"""
     if _collection.count() == 0:

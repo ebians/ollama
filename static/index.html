@@ -138,6 +138,15 @@
             cursor: pointer; font-size: 0.8rem;
         }
         .user-info .logout-btn:hover { background: rgba(255,255,255,0.3); }
+
+        /* Model selector */
+        .model-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .model-row label { font-size: 0.85rem; color: #64748b; white-space: nowrap; }
+        .model-row select {
+            flex: 1; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+            font-size: 0.85rem; background: #fff; color: #1e293b; outline: none; max-width: 300px;
+        }
+        .model-row select:focus { border-color: #2563eb; }
     </style>
 </head>
 <body>
@@ -183,6 +192,10 @@
             <button class="mode-btn" data-mode="hybrid" onclick="setMode('hybrid', this)">🔀 ハイブリッド</button>
             <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリーチャット</button>
         </div>
+        <div class="model-row">
+            <label for="model-select">🤖 モデル:</label>
+            <select id="model-select"><option value="">読み込み中...</option></select>
+        </div>
         <div id="chat-log"></div>
         <div class="input-row">
             <input type="text" id="question" placeholder="社内ドキュメントについて質問..." autocomplete="off">
@@ -190,7 +203,7 @@
         </div>
     </div>
 
-    <footer>Powered by Ollama (qwen2.5:7b) + ChromaDB</footer>
+    <footer>Powered by Ollama + ChromaDB</footer>
 </div>
 </div>
 
@@ -204,6 +217,7 @@ let chatHistory = []; // 会話履歴 [{role, content}, ...]
 let currentMode = 'rag';
 let currentSessionId = '';  // 現在のセッションID
 let currentUser = null;
+let currentModel = '';  // 空ならデフォルト
 
 // ---------- Auth ----------
 async function checkAuth() {
@@ -235,6 +249,7 @@ function showApp() {
     }
     loadStats();
     loadSessions();
+    loadModels();
 }
 
 async function doLogin() {
@@ -300,6 +315,30 @@ async function loadStats() {
     } catch { statsEl.textContent = '接続エラー'; }
 }
 
+async function loadModels() {
+    const sel = document.getElementById('model-select');
+    try {
+        const [modelsRes, statsRes] = await Promise.all([fetch('/api/models'), fetch('/api/stats')]);
+        const models = await modelsRes.json();
+        const stats = await statsRes.json();
+        const defaultModel = stats.default_model || '';
+        sel.innerHTML = '';
+        for (const m of models) {
+            const opt = document.createElement('option');
+            opt.value = m.name;
+            const sizeMB = (m.size / 1024 / 1024 / 1024).toFixed(1);
+            opt.textContent = `${m.name} (${sizeMB} GB)`;
+            if (m.name === defaultModel) opt.selected = true;
+            sel.appendChild(opt);
+        }
+        if (models.length === 0) sel.innerHTML = '<option value="">モデルなし</option>';
+        sel.addEventListener('change', () => { currentModel = sel.value; });
+        currentModel = sel.value;
+    } catch {
+        sel.innerHTML = '<option value="">取得失敗</option>';
+    }
+}
+
 // ---------- Chat ----------
 questionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) ask(); });
 
@@ -316,7 +355,7 @@ async function ask() {
         const r = await fetch('/api/ask/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: q, history: chatHistory, mode: currentMode, session_id: currentSessionId }),
+            body: JSON.stringify({ question: q, history: chatHistory, mode: currentMode, session_id: currentSessionId, model: currentModel }),
         });
 
         const reader = r.body.getReader();
