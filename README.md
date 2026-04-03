@@ -154,15 +154,20 @@ ollama/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py            # 設定（環境変数から読み込み）
+│   ├── chat_store.py        # チャット履歴 (SQLite)
 │   ├── main.py              # FastAPI エンドポイント
 │   ├── ollama_client.py     # Ollama API クライアント（Embedding / Chat / Streaming）
-│   ├── parser.py            # ファイル解析（txt / pdf / docx）
+│   ├── parser.py            # ファイル解析（txt / pdf / docx / xlsx / OCR）
 │   └── vectorstore.py       # ChromaDB 操作（登録 / 検索 / リセット）
 ├── static/
-│   └── index.html           # フロントエンド UI
+│   ├── index.html           # ユーザー向け UI
+│   └── admin.html           # 管理者向け UI
 ├── docs/                    # サンプルドキュメント
 ├── bulk_import.py           # フォルダ一括登録スクリプト
 ├── Caddyfile                # Caddy リバースプロキシ設定
+├── Dockerfile               # アプリコンテナ定義
+├── docker-compose.yml       # 一発起動定義
+├── .dockerignore
 ├── requirements.txt
 └── .gitignore
 ```
@@ -274,3 +279,71 @@ caddy start --config Caddyfile
 
 Let's Encrypt による HTTPS 証明書が自動で取得・更新されます。  
 `flush_interval -1` によりSSEストリーミングがバッファリングなしで通ります。
+
+## Docker で起動
+
+Docker Compose を使うと、Ollama + アプリを一発で起動できます。
+
+### 前提条件
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) がインストール済み
+- NVIDIA GPU を使う場合: [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) がインストール済み
+
+### 起動
+
+```bash
+docker compose up -d --build
+```
+
+初回起動時はモデルのダウンロードが必要です:
+
+```bash
+docker exec ollama ollama pull qwen2.5:7b
+docker exec ollama ollama pull nomic-embed-text
+```
+
+ブラウザで **http://localhost:8000** にアクセスしてください。
+
+### 停止
+
+```bash
+docker compose down
+```
+
+### データの永続化
+
+| ボリューム | 内容 |
+|---|---|
+| `ollama_models` | Ollama のモデルデータ |
+| `app_data` | ChromaDB + チャット履歴 (SQLite) |
+
+ボリュームは `docker compose down` では削除されません。  
+完全に削除する場合は `docker compose down -v` を使います。
+
+### 環境変数のカスタマイズ
+
+`docker-compose.yml` の `environment` セクションで設定を変更できます:
+
+```yaml
+environment:
+  - CHAT_MODEL=qwen2.5:14b      # モデル変更
+  - ADMIN_PASSWORD=your-secret   # 管理者パスワード変更
+  - TOP_K=5                      # 検索チャンク数変更
+```
+
+### GPU なしで起動（CPU のみ）
+
+`docker-compose.yml` の `ollama` サービスから `deploy` セクションを削除してください:
+
+```yaml
+services:
+  ollama:
+    image: ollama/ollama:latest
+    # deploy セクションを削除
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+```
+
+> **注意**: CPU モードでは応答速度が大幅に低下します。

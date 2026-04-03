@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+chroma_data/
+chat_history.db
+.git/
+.gitignore
+*.md
+Caddyfile
+docs/
