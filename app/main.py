@@ -2,7 +2,7 @@ import json
 import secrets
 import uuid
 
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Request, Response, Cookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -15,6 +15,10 @@ from app.vectorstore import add_document, search, get_stats, reset_db, list_docu
 from app.chat_store import (
     create_session, add_message, get_sessions, get_messages, delete_session,
 )
+from app.user_store import (
+    authenticate, create_token, get_user_by_token, delete_token,
+    create_user, list_users, delete_user,
+)
 
 app = FastAPI(title="Ollama RAG App")
 security = HTTPBasic()
@@ -25,6 +29,35 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     if not secrets.compare_digest(credentials.password, ADMIN_PASSWORD):
         raise HTTPException(status_code=401, detail="認証エラー", headers={"WWW-Authenticate": "Basic"})
     return credentials.username
+
+
+def get_current_user(auth_token: str = Cookie(default="")):
+    """Cookieトークンからログインユーザーを取得する"""
+    if not auth_token:
+        return None
+    return get_user_by_token(auth_token)
+
+
+def require_user(auth_token: str = Cookie(default="")):
+    """ログイン必須のエンドポイント用"""
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="ログインが必要です")
+    user = get_user_by_token(auth_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="セッションが無効です")
+    return user
+
+
+def require_admin_user(user: dict = Depends(require_user)):
+    """管理者ユーザー必須のエンドポイント用"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="管理者権限が必要です")
+    return user
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 
 class AskRequest(BaseModel):
@@ -41,10 +74,71 @@ class AskResponse(BaseModel):
 
 # ---------- API ----------
 
+# ---------- 認証 API ----------
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest, response: Response):
+    """ログイン → Cookieにトークン設定"""
+    user = authenticate(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="ユーザー名またはパスワードが間違っています")
+    token = create_token(user["id"])
+    response.set_cookie("auth_token", token, httponly=True, samesite="lax", max_age=60*60*24*30)
+    return {"user": user}
+
+
+@app.post("/api/auth/logout")
+async def logout(response: Response, auth_token: str = Cookie(default="")):
+    """ログアウト → Cookie削除"""
+    if auth_token:
+        delete_token(auth_token)
+    response.delete_cookie("auth_token")
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/me")
+async def get_me(user: dict | None = Depends(get_current_user)):
+    """現在のログインユーザー情報を返す"""
+    if not user:
+        return {"user": None}
+    return {"user": user}
+
+
+# ---------- ユーザー管理 API（管理者のみ）----------
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    display_name: str = ""
+    is_admin: bool = False
+
+
+@app.post("/api/users")
+async def api_create_user(req: CreateUserRequest, _admin: dict = Depends(require_admin_user)):
+    """ユーザーを作成する（管理者のみ）"""
+    user_id = create_user(req.username, req.password, req.display_name, req.is_admin)
+    if not user_id:
+        raise HTTPException(status_code=409, detail="ユーザー名が既に使われています")
+    return {"user_id": user_id, "username": req.username}
+
+
+@app.get("/api/users")
+async def api_list_users(_admin: dict = Depends(require_admin_user)):
+    """ユーザー一覧を返す（管理者のみ）"""
+    return list_users()
+
+
+@app.delete("/api/users/{user_id}")
+async def api_delete_user(user_id: str, _admin: dict = Depends(require_admin_user)):
+    """ユーザーを削除する（管理者のみ）"""
+    delete_user(user_id)
+    return {"status": "ok"}
+
+
 # ---------- 管理者専用 API ----------
 
 @app.post("/api/upload")
-async def upload_document(file: UploadFile = File(...), _user: str = Depends(verify_admin)):
+async def upload_document(file: UploadFile = File(...), _admin: dict = Depends(require_admin_user)):
     """ファイル(.txt/.pdf/.docx/.xlsx)をアップロードし、ベクトルDBに格納する（管理者専用）"""
     filename = file.filename or "unknown"
     ext = ("." + filename.rsplit(".", 1)[-1]).lower() if "." in filename else ""
@@ -58,13 +152,13 @@ async def upload_document(file: UploadFile = File(...), _user: str = Depends(ver
 
 
 @app.get("/api/documents")
-async def get_documents(_user: str = Depends(verify_admin)):
+async def get_documents(_admin: dict = Depends(require_admin_user)):
     """登録済みドキュメント一覧を返す（管理者専用）"""
     return list_documents()
 
 
 @app.delete("/api/documents/{source:path}")
-async def remove_document(source: str, _user: str = Depends(verify_admin)):
+async def remove_document(source: str, _admin: dict = Depends(require_admin_user)):
     """指定ドキュメントを削除する（管理者専用）"""
     deleted = delete_document(source)
     if deleted == 0:
@@ -73,7 +167,7 @@ async def remove_document(source: str, _user: str = Depends(verify_admin)):
 
 
 @app.post("/api/reset")
-async def reset(_user: str = Depends(verify_admin)):
+async def reset(_admin: dict = Depends(require_admin_user)):
     """ドキュメントを全削除する（管理者専用）"""
     reset_db()
     return {"status": "ok"}
@@ -95,10 +189,11 @@ async def ask_question(req: AskRequest):
 
 
 @app.post("/api/ask/stream")
-async def ask_question_stream(req: AskRequest):
+async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_current_user)):
     """ストリーミング回答（SSE、モード対応、履歴保存）"""
     # セッション管理
-    session_id = req.session_id or create_session(req.question[:50], req.mode)
+    user_id = user["id"] if user else ""
+    session_id = req.session_id or create_session(req.question[:50], req.mode, user_id)
     add_message(session_id, "user", req.question)
 
     hits = []
@@ -147,13 +242,14 @@ async def stats():
 # ---------- チャット履歴 API ----------
 
 @app.get("/api/sessions")
-async def list_sessions():
-    """チャットセッション一覧を返す"""
-    return get_sessions()
+async def list_sessions(user: dict | None = Depends(get_current_user)):
+    """チャットセッション一覧を返す（ログイン時は自分のセッションのみ）"""
+    user_id = user["id"] if user else ""
+    return get_sessions(user_id=user_id)
 
 
 @app.get("/api/sessions/{session_id}")
-async def get_session_messages(session_id: str):
+async def get_session_messages(session_id: str, user: dict | None = Depends(get_current_user)):
     """セッションのメッセージ一覧を返す"""
     messages = get_messages(session_id)
     if not messages:
@@ -162,7 +258,7 @@ async def get_session_messages(session_id: str):
 
 
 @app.delete("/api/sessions/{session_id}")
-async def remove_session(session_id: str):
+async def remove_session(session_id: str, user: dict | None = Depends(get_current_user)):
     """セッションを削除する"""
     delete_session(session_id)
     return {"status": "ok"}

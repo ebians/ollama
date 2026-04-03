@@ -104,9 +104,55 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
+
+        /* Login overlay */
+        .login-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .login-overlay.hidden { display: none; }
+        .login-card {
+            background: #fff; border-radius: 16px; padding: 40px; width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center;
+        }
+        .login-card h2 { font-size: 1.3rem; margin-bottom: 8px; color: #1e293b; }
+        .login-card p { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+        .login-card input {
+            width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 0.95rem; margin-bottom: 12px; outline: none;
+        }
+        .login-card input:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+        .login-card .login-btn {
+            width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none;
+            border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+        }
+        .login-card .login-btn:hover { background: #1d4ed8; }
+        .login-card .login-error { color: #ef4444; font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
+
+        /* User info */
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-info .username { font-size: 0.85rem; opacity: 0.9; }
+        .user-info .logout-btn {
+            padding: 4px 10px; background: rgba(255,255,255,0.2); color: #fff;
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem;
+        }
+        .user-info .logout-btn:hover { background: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
+<!-- Login Overlay -->
+<div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+        <h2>📚 社内RAGアシスタント</h2>
+        <p>ログインしてください</p>
+        <input type="text" id="login-username" placeholder="ユーザー名" autocomplete="username">
+        <input type="password" id="login-password" placeholder="パスワード" autocomplete="current-password">
+        <button class="login-btn" id="login-btn" onclick="doLogin()">ログイン</button>
+        <div class="login-error" id="login-error"></div>
+    </div>
+</div>
+
 <div class="sidebar">
     <h3>💬 チャット履歴</h3>
     <button class="sidebar-btn" onclick="newSession()">＋ 新しいチャット</button>
@@ -121,7 +167,11 @@
         </div>
         <div style="text-align:right">
             <div id="stats">読み込み中...</div>
-            <a href="/admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px">管理画面</a>
+            <div class="user-info" id="user-info" style="display:none; margin-top:4px; justify-content:flex-end;">
+                <span class="username" id="user-display"></span>
+                <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+            </div>
+            <a href="/admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px" id="admin-link" class="hidden">管理画面</a>
         </div>
     </header>
 
@@ -153,6 +203,81 @@ const statsEl = document.getElementById('stats');
 let chatHistory = []; // 会話履歴 [{role, content}, ...]
 let currentMode = 'rag';
 let currentSessionId = '';  // 現在のセッションID
+let currentUser = null;
+
+// ---------- Auth ----------
+async function checkAuth() {
+    try {
+        const r = await fetch('/api/auth/me');
+        const data = await r.json();
+        if (data.user) {
+            currentUser = data.user;
+            showApp();
+        } else {
+            showLogin();
+        }
+    } catch {
+        showLogin();
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-overlay').classList.remove('hidden');
+}
+
+function showApp() {
+    document.getElementById('login-overlay').classList.add('hidden');
+    const display = currentUser.display_name || currentUser.username;
+    document.getElementById('user-display').textContent = `👤 ${display}`;
+    document.getElementById('user-info').style.display = 'flex';
+    if (currentUser.is_admin) {
+        document.getElementById('admin-link').style.display = 'inline-block';
+    }
+    loadStats();
+    loadSessions();
+}
+
+async function doLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+    errorEl.textContent = '';
+    if (!username || !password) { errorEl.textContent = 'ユーザー名とパスワードを入力してください'; return; }
+    try {
+        const r = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+        if (!r.ok) {
+            const e = await r.json();
+            errorEl.textContent = e.detail || 'ログインに失敗しました';
+            return;
+        }
+        const data = await r.json();
+        currentUser = data.user;
+        showApp();
+    } catch (e) {
+        errorEl.textContent = 'サーバーに接続できません';
+    }
+}
+
+async function doLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    currentUser = null;
+    currentSessionId = '';
+    chatHistory = [];
+    chatLog.innerHTML = '';
+    document.getElementById('session-list').innerHTML = '';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('admin-link').style.display = 'none';
+    showLogin();
+}
+
+// Login form keyboard support
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+
 
 function setMode(mode, btn) {
     currentMode = mode;
@@ -174,7 +299,6 @@ async function loadStats() {
         statsEl.textContent = `登録チャンク数: ${d.total_chunks}`;
     } catch { statsEl.textContent = '接続エラー'; }
 }
-loadStats();
 
 // ---------- Chat ----------
 questionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) ask(); });
@@ -335,6 +459,9 @@ async function deleteSessionUI(sessionId) {
 }
 
 loadSessions();
+
+// ---------- Init ----------
+checkAuth();
 </script>
 </body>
 </html>

@@ -58,9 +58,53 @@
         .btn-reset { margin-top: 16px; }
 
         footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
+
+        /* Login overlay */
+        .login-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .login-overlay.hidden { display: none; }
+        .login-card {
+            background: #fff; border-radius: 16px; padding: 40px; width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center;
+        }
+        .login-card h2 { font-size: 1.3rem; margin-bottom: 8px; color: #1e293b; }
+        .login-card p { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+        .login-card input {
+            width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 0.95rem; margin-bottom: 12px; outline: none;
+        }
+        .login-card input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220,38,38,0.15); }
+        .login-card .login-btn {
+            width: 100%; padding: 12px; background: #dc2626; color: #fff; border: none;
+            border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+        }
+        .login-card .login-btn:hover { background: #b91c1c; }
+        .login-card .login-error { color: #ef4444; font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
+
+        .user-bar { display: flex; align-items: center; gap: 10px; }
+        .user-bar .logout-btn {
+            padding: 4px 10px; background: rgba(255,255,255,0.2); color: #fff;
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem;
+        }
+        .user-bar .logout-btn:hover { background: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
+<!-- Login Overlay -->
+<div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+        <h2>🔧 管理画面</h2>
+        <p>管理者アカウントでログインしてください</p>
+        <input type="text" id="login-username" placeholder="ユーザー名" autocomplete="username">
+        <input type="password" id="login-password" placeholder="パスワード" autocomplete="current-password">
+        <button class="login-btn" id="login-btn" onclick="doLogin()">ログイン</button>
+        <div class="login-error" id="login-error"></div>
+    </div>
+</div>
+
 <div class="container">
     <header>
         <div>
@@ -69,6 +113,10 @@
         </div>
         <div style="text-align:right">
             <a href="/">← ユーザー画面に戻る</a>
+            <div class="user-bar" id="user-bar" style="display:none; margin-top:4px; justify-content:flex-end;">
+                <span id="user-display" style="font-size:0.85rem;"></span>
+                <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+            </div>
         </div>
     </header>
 
@@ -111,27 +159,67 @@ const uploadStatus = document.getElementById('upload-status');
 const docListEl = document.getElementById('doc-list');
 
 // ---------- Auth ----------
-let authHeader = '';
-
-function getAuth() {
-    if (authHeader) return authHeader;
-    const password = prompt('管理者パスワードを入力してください');
-    if (!password) {
-        location.href = '/';
-        return '';
+async function checkAuth() {
+    try {
+        const r = await fetch('/api/auth/me');
+        const data = await r.json();
+        if (data.user && data.user.is_admin) {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('user-display').textContent = `👤 ${data.user.display_name || data.user.username}`;
+            document.getElementById('user-bar').style.display = 'flex';
+            loadData();
+        } else if (data.user) {
+            alert('管理者権限が必要です');
+            location.href = '/';
+        } else {
+            document.getElementById('login-overlay').classList.remove('hidden');
+        }
+    } catch {
+        document.getElementById('login-overlay').classList.remove('hidden');
     }
-    authHeader = 'Basic ' + btoa('admin:' + password);
-    return authHeader;
 }
 
+async function doLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+    errorEl.textContent = '';
+    if (!username || !password) { errorEl.textContent = 'ユーザー名とパスワードを入力してください'; return; }
+    try {
+        const r = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+        if (!r.ok) {
+            const e = await r.json();
+            errorEl.textContent = e.detail || 'ログインに失敗しました';
+            return;
+        }
+        const data = await r.json();
+        if (!data.user.is_admin) {
+            errorEl.textContent = '管理者権限が必要です';
+            await fetch('/api/auth/logout', { method: 'POST' });
+            return;
+        }
+        checkAuth();
+    } catch (e) {
+        errorEl.textContent = 'サーバーに接続できません';
+    }
+}
+
+async function doLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    location.reload();
+}
+
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+
 async function authFetch(url, options = {}) {
-    const auth = getAuth();
-    if (!auth) return null;
-    options.headers = { ...options.headers, 'Authorization': auth };
     const r = await fetch(url, options);
-    if (r.status === 401) {
-        authHeader = '';
-        alert('パスワードが正しくありません');
+    if (r.status === 401 || r.status === 403) {
+        alert('セッションが期限切れです。再ログインしてください。');
         location.reload();
         return null;
     }
@@ -232,7 +320,7 @@ function escapeAttr(s) {
 }
 
 // ---------- Init ----------
-loadData();
+checkAuth();
 </script>
 </body>
 </html>

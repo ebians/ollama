@@ -24,6 +24,7 @@ def _init_db():
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             mode TEXT NOT NULL DEFAULT 'rag',
+            user_id TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -37,6 +38,10 @@ def _init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
     """)
+    # user_id カラムがない場合に追加（既存DB互換）
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
     conn.close()
 
 
@@ -47,14 +52,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def create_session(title: str = "", mode: str = "rag") -> str:
+def create_session(title: str = "", mode: str = "rag", user_id: str = "") -> str:
     """新しいチャットセッションを作成する"""
     session_id = uuid.uuid4().hex[:12]
     now = _now()
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO sessions (id, title, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (session_id, title or "新しいチャット", mode, now, now),
+        "INSERT INTO sessions (id, title, mode, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, title or "新しいチャット", mode, user_id, now, now),
     )
     conn.commit()
     conn.close()
@@ -83,13 +88,19 @@ def add_message(session_id: str, role: str, content: str, sources: list[dict] | 
     conn.close()
 
 
-def get_sessions(limit: int = 50) -> list[dict]:
-    """セッション一覧を返す（新しい順）"""
+def get_sessions(limit: int = 50, user_id: str = "") -> list[dict]:
+    """セッション一覧を返す（新しい順、user_id指定時はそのユーザーのみ）"""
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT id, title, mode, created_at, updated_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+    if user_id:
+        rows = conn.execute(
+            "SELECT id, title, mode, created_at, updated_at FROM sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, title, mode, created_at, updated_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
