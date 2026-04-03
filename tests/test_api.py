@@ -226,6 +226,43 @@ class TestChunkPreview:
         assert r.status_code == 403
 
 
+class TestPasswordChange:
+    @patch("app.main.change_password", return_value=True)
+    async def test_change_password_success(self, mock_change, client, as_user):
+        r = await client.post("/api/auth/password", json={"old_password": "old", "new_password": "newpass"})
+        assert r.status_code == 200
+        mock_change.assert_called_once_with("user001", "old", "newpass")
+
+    @patch("app.main.change_password", return_value=False)
+    async def test_change_password_wrong_old(self, mock_change, client, as_user):
+        r = await client.post("/api/auth/password", json={"old_password": "wrong", "new_password": "newpass"})
+        assert r.status_code == 400
+
+    async def test_change_password_too_short(self, client, as_user):
+        r = await client.post("/api/auth/password", json={"old_password": "old", "new_password": "ab"})
+        assert r.status_code == 400
+
+    async def test_change_password_no_auth(self, client):
+        r = await client.post("/api/auth/password", json={"old_password": "old", "new_password": "newpass"})
+        assert r.status_code == 401
+
+
+class TestPasswordReset:
+    @patch("app.main.reset_password")
+    async def test_reset_password_as_admin(self, mock_reset, client, as_admin):
+        r = await client.post("/api/users/user001/reset-password", json={"new_password": "newpass"})
+        assert r.status_code == 200
+        mock_reset.assert_called_once_with("user001", "newpass")
+
+    async def test_reset_password_as_user(self, client, as_user):
+        r = await client.post("/api/users/user001/reset-password", json={"new_password": "newpass"})
+        assert r.status_code == 403
+
+    async def test_reset_password_too_short(self, client, as_admin):
+        r = await client.post("/api/users/user001/reset-password", json={"new_password": "ab"})
+        assert r.status_code == 400
+
+
 class TestStaticPages:
     async def test_index(self, client):
         r = await client.get("/")

@@ -128,6 +128,27 @@ def delete_user(user_id: str):
     conn.close()
 
 
+def change_password(user_id: str, old_password: str, new_password: str) -> bool:
+    """パスワードを変更する。旧パスワード検証付き"""
+    conn = _get_conn()
+    row = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row or not _check_password(old_password, row["password_hash"]):
+        conn.close()
+        return False
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (_hash_password(new_password), user_id))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def reset_password(user_id: str, new_password: str):
+    """管理者がパスワードをリセットする（旧パスワード不要）"""
+    conn = _get_conn()
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (_hash_password(new_password), user_id))
+    conn.commit()
+    conn.close()
+
+
 def ensure_admin_exists():
     """管理者ユーザーが存在しない場合はデフォルトで作成する"""
     conn = _get_conn()

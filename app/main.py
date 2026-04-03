@@ -17,7 +17,7 @@ from app.chat_store import (
 )
 from app.user_store import (
     authenticate, create_token, get_user_by_token, delete_token,
-    create_user, list_users, delete_user,
+    create_user, list_users, delete_user, change_password, reset_password,
 )
 
 app = FastAPI(title="Ollama RAG App")
@@ -105,6 +105,22 @@ async def get_me(user: dict | None = Depends(get_current_user)):
     return {"user": user}
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@app.post("/api/auth/password")
+async def api_change_password(req: ChangePasswordRequest, user: dict = Depends(require_user)):
+    """ログインユーザー自身のパスワードを変更する"""
+    if len(req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="パスワードは4文字以上です")
+    ok = change_password(user["id"], req.old_password, req.new_password)
+    if not ok:
+        raise HTTPException(status_code=400, detail="現在のパスワードが正しくありません")
+    return {"status": "ok"}
+
+
 # ---------- ユーザー管理 API（管理者のみ）----------
 
 class CreateUserRequest(BaseModel):
@@ -133,6 +149,19 @@ async def api_list_users(_admin: dict = Depends(require_admin_user)):
 async def api_delete_user(user_id: str, _admin: dict = Depends(require_admin_user)):
     """ユーザーを削除する（管理者のみ）"""
     delete_user(user_id)
+    return {"status": "ok"}
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+
+@app.post("/api/users/{user_id}/reset-password")
+async def api_reset_password(user_id: str, req: ResetPasswordRequest, _admin: dict = Depends(require_admin_user)):
+    """管理者がユーザーのパスワードをリセットする"""
+    if len(req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="パスワードは4文字以上です")
+    reset_password(user_id, req.new_password)
     return {"status": "ok"}
 
 

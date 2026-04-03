@@ -138,6 +138,32 @@
             cursor: pointer; font-size: 0.8rem;
         }
         .user-info .logout-btn:hover { background: rgba(255,255,255,0.3); }
+        .user-info .pw-btn {
+            padding: 4px 10px; background: rgba(255,255,255,0.15); color: #fff;
+            border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem;
+        }
+        .user-info .pw-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* Password change modal */
+        .pw-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .pw-overlay.hidden { display: none; }
+        .pw-card {
+            background: #fff; border-radius: 16px; padding: 32px; width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .pw-card h3 { font-size: 1.1rem; margin-bottom: 16px; color: #1e293b; }
+        .pw-card input {
+            width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 0.95rem; margin-bottom: 10px; outline: none;
+        }
+        .pw-card input:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+        .pw-card .pw-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .pw-card .pw-actions button { flex: 1; padding: 10px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; }
+        .pw-card .pw-msg { font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
 
         /* Model selector */
         .model-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -178,6 +204,7 @@
             <div id="stats">読み込み中...</div>
             <div class="user-info" id="user-info" style="display:none; margin-top:4px; justify-content:flex-end;">
                 <span class="username" id="user-display"></span>
+                <button class="pw-btn" onclick="showPasswordModal()">PW変更</button>
                 <button class="logout-btn" onclick="doLogout()">ログアウト</button>
             </div>
             <a href="/admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px" id="admin-link" class="hidden">管理画面</a>
@@ -205,6 +232,21 @@
 
     <footer>Powered by Ollama + ChromaDB</footer>
 </div>
+</div>
+
+<!-- Password Change Modal -->
+<div class="pw-overlay hidden" id="pw-modal">
+    <div class="pw-card">
+        <h3>🔒 パスワード変更</h3>
+        <input type="password" id="pw-old" placeholder="現在のパスワード" autocomplete="current-password">
+        <input type="password" id="pw-new" placeholder="新しいパスワード（4文字以上）" autocomplete="new-password">
+        <input type="password" id="pw-confirm" placeholder="新しいパスワード（確認）" autocomplete="new-password">
+        <div class="pw-actions">
+            <button style="background:#e2e8f0;color:#374151;border:none;cursor:pointer" onclick="closePasswordModal()">キャンセル</button>
+            <button class="btn-primary" style="border:none;cursor:pointer" onclick="doChangePassword()">変更</button>
+        </div>
+        <div class="pw-msg" id="pw-msg"></div>
+    </div>
 </div>
 
 <script>
@@ -292,6 +334,52 @@ async function doLogout() {
 // Login form keyboard support
 document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('login-username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+
+// ---------- Password Change ----------
+function showPasswordModal() {
+    document.getElementById('pw-old').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    document.getElementById('pw-msg').textContent = '';
+    document.getElementById('pw-modal').classList.remove('hidden');
+    document.getElementById('pw-old').focus();
+}
+
+function closePasswordModal() {
+    document.getElementById('pw-modal').classList.add('hidden');
+}
+
+document.getElementById('pw-modal').addEventListener('click', function(e) {
+    if (e.target === this) closePasswordModal();
+});
+
+async function doChangePassword() {
+    const oldPw = document.getElementById('pw-old').value;
+    const newPw = document.getElementById('pw-new').value;
+    const confirmPw = document.getElementById('pw-confirm').value;
+    const msgEl = document.getElementById('pw-msg');
+    msgEl.style.color = '#ef4444';
+    if (!oldPw || !newPw) { msgEl.textContent = '全項目を入力してください'; return; }
+    if (newPw.length < 4) { msgEl.textContent = 'パスワードは4文字以上です'; return; }
+    if (newPw !== confirmPw) { msgEl.textContent = '新しいパスワードが一致しません'; return; }
+    try {
+        const r = await fetch('/api/auth/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ old_password: oldPw, new_password: newPw }),
+        });
+        if (r.ok) {
+            msgEl.style.color = '#16a34a';
+            msgEl.textContent = '✅ パスワードを変更しました';
+            setTimeout(closePasswordModal, 1500);
+        } else {
+            const e = await r.json();
+            msgEl.textContent = e.detail || '変更に失敗しました';
+        }
+    } catch {
+        msgEl.textContent = 'サーバーに接続できません';
+    }
+}
 
 
 function setMode(mode, btn) {

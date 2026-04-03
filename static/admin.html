@@ -126,6 +126,36 @@
             font-size: 0.9rem; line-height: 1.6; color: #374151;
             white-space: pre-wrap; word-break: break-word;
         }
+
+        /* User management */
+        .user-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+        .user-form .field { display: flex; flex-direction: column; gap: 3px; }
+        .user-form .field label { font-size: 0.75rem; color: #64748b; }
+        .user-form .field input {
+            padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+            font-size: 0.85rem; outline: none; width: 140px;
+        }
+        .user-form .field input:focus { border-color: #2563eb; }
+        .user-form .field select {
+            padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+            font-size: 0.85rem; background: #fff;
+        }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+        .btn-warn { background: #f59e0b; color: #fff; margin-right: 4px; }
+        .btn-warn:hover { background: #d97706; }
+        .user-msg { font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
+        .user-msg.ok { color: #16a34a; }
+        .user-msg.err { color: #ef4444; }
+        .badge-admin {
+            display: inline-block; background: #dc2626; color: #fff; font-size: 0.7rem;
+            padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: middle;
+        }
+        .badge-user {
+            display: inline-block; background: #64748b; color: #fff; font-size: 0.7rem;
+            padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -166,6 +196,10 @@
             <div class="num" id="stat-chunks">-</div>
             <div class="label">チャンク数</div>
         </div>
+        <div class="stat-item">
+            <div class="num" id="stat-users">-</div>
+            <div class="label">ユーザー数</div>
+        </div>
     </div>
 
     <!-- Upload Card -->
@@ -183,6 +217,35 @@
         <h2>📋 登録済みドキュメント</h2>
         <div id="doc-list"></div>
         <button class="btn-danger btn-reset" onclick="resetAll()">⚠ 全ドキュメント削除</button>
+    </div>
+
+    <!-- User Management Card -->
+    <div class="card">
+        <h2>👥 ユーザー管理</h2>
+        <div class="user-form">
+            <div class="field">
+                <label>ユーザー名</label>
+                <input type="text" id="new-username" placeholder="username" autocomplete="off">
+            </div>
+            <div class="field">
+                <label>表示名</label>
+                <input type="text" id="new-displayname" placeholder="表示名（任意）" autocomplete="off">
+            </div>
+            <div class="field">
+                <label>パスワード</label>
+                <input type="password" id="new-password" placeholder="4文字以上" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label>権限</label>
+                <select id="new-role">
+                    <option value="user">一般ユーザー</option>
+                    <option value="admin">管理者</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="createUser()">＋ 追加</button>
+        </div>
+        <div class="user-msg" id="user-msg"></div>
+        <div id="user-list"></div>
     </div>
 
     <footer>管理者専用画面 — 認証が必要です</footer>
@@ -292,22 +355,24 @@ async function loadData() {
 
     if (docs.length === 0) {
         docListEl.innerHTML = '<div class="doc-empty">ドキュメントが登録されていません</div>';
-        return;
+    } else {
+        let html = '<table class="doc-table"><thead><tr><th>ファイル名</th><th>チャンク数</th><th></th></tr></thead><tbody>';
+        for (const doc of docs) {
+            html += `<tr>
+                <td>${escapeHtml(doc.source)}</td>
+                <td>${doc.chunks}</td>
+                <td>
+                    <button class="btn-preview" onclick="previewChunks('${escapeAttr(doc.source)}')">プレビュー</button>
+                    <button class="btn-danger-outline" onclick="deleteDoc('${escapeAttr(doc.source)}')">削除</button>
+                </td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        docListEl.innerHTML = html;
     }
 
-    let html = '<table class="doc-table"><thead><tr><th>ファイル名</th><th>チャンク数</th><th></th></tr></thead><tbody>';
-    for (const doc of docs) {
-        html += `<tr>
-            <td>${escapeHtml(doc.source)}</td>
-            <td>${doc.chunks}</td>
-            <td>
-                <button class="btn-preview" onclick="previewChunks('${escapeAttr(doc.source)}')">プレビュー</button>
-                <button class="btn-danger-outline" onclick="deleteDoc('${escapeAttr(doc.source)}')">削除</button>
-            </td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
-    docListEl.innerHTML = html;
+    // Load users
+    loadUsers();
 }
 
 // ---------- Upload ----------
@@ -408,6 +473,97 @@ function closeChunkModal() {
 document.getElementById('chunk-modal').addEventListener('click', function(e) {
     if (e.target === this) closeChunkModal();
 });
+
+// ---------- User Management ----------
+async function loadUsers() {
+    const r = await authFetch('/api/users');
+    if (!r) return;
+    const users = await r.json();
+    document.getElementById('stat-users').textContent = users.length;
+    const listEl = document.getElementById('user-list');
+
+    if (users.length === 0) {
+        listEl.innerHTML = '<div class="doc-empty">ユーザーがいません</div>';
+        return;
+    }
+
+    let html = '<table class="doc-table"><thead><tr><th>ユーザー名</th><th>表示名</th><th>権限</th><th>作成日</th><th></th></tr></thead><tbody>';
+    for (const u of users) {
+        const badge = u.is_admin ? '<span class="badge-admin">管理者</span>' : '<span class="badge-user">一般</span>';
+        const created = u.created_at ? u.created_at.slice(0, 10) : '';
+        html += `<tr>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.display_name)}</td>
+            <td>${badge}</td>
+            <td style="font-size:0.8rem;color:#64748b">${created}</td>
+            <td>
+                <button class="btn-warn btn-sm" onclick="resetUserPassword('${escapeAttr(u.id)}', '${escapeAttr(u.username)}')">PW変更</button>
+                <button class="btn-danger-outline btn-sm" onclick="deleteUserUI('${escapeAttr(u.id)}', '${escapeAttr(u.username)}')">削除</button>
+            </td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+}
+
+function showUserMsg(text, isError) {
+    const el = document.getElementById('user-msg');
+    el.textContent = text;
+    el.className = 'user-msg ' + (isError ? 'err' : 'ok');
+    setTimeout(() => { el.textContent = ''; }, 5000);
+}
+
+async function createUser() {
+    const username = document.getElementById('new-username').value.trim();
+    const displayName = document.getElementById('new-displayname').value.trim();
+    const password = document.getElementById('new-password').value;
+    const role = document.getElementById('new-role').value;
+    if (!username || !password) { showUserMsg('ユーザー名とパスワードは必須です', true); return; }
+    if (password.length < 4) { showUserMsg('パスワードは4文字以上です', true); return; }
+    const r = await authFetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, display_name: displayName, is_admin: role === 'admin' }),
+    });
+    if (!r) return;
+    if (r.ok) {
+        showUserMsg(`✅ ${username} を作成しました`, false);
+        document.getElementById('new-username').value = '';
+        document.getElementById('new-displayname').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('new-role').value = 'user';
+        loadUsers();
+    } else {
+        const e = await r.json();
+        showUserMsg(e.detail || '作成に失敗しました', true);
+    }
+}
+
+async function deleteUserUI(userId, username) {
+    if (!confirm(`「${username}」を削除しますか？\nこのユーザーのチャット履歴は残ります。`)) return;
+    const r = await authFetch(`/api/users/${userId}`, { method: 'DELETE' });
+    if (r && r.ok) {
+        showUserMsg(`${username} を削除しました`, false);
+        loadUsers();
+    }
+}
+
+async function resetUserPassword(userId, username) {
+    const newPw = prompt(`「${username}」の新しいパスワードを入力してください（4文字以上）`);
+    if (!newPw) return;
+    if (newPw.length < 4) { showUserMsg('パスワードは4文字以上です', true); return; }
+    const r = await authFetch(`/api/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: newPw }),
+    });
+    if (r && r.ok) {
+        showUserMsg(`${username} のパスワードをリセットしました`, false);
+    } else if (r) {
+        const e = await r.json();
+        showUserMsg(e.detail || 'リセットに失敗しました', true);
+    }
+}
 
 // ---------- Init ----------
 checkAuth();
