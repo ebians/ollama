@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理画面 — 社内RAGアシスタント</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Meiryo', sans-serif; background: #f0f2f5; color: #1a1a1a; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        header {
+            background: linear-gradient(135deg, #dc2626, #9333ea);
+            color: #fff; padding: 24px 32px; border-radius: 12px; margin-bottom: 24px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        header h1 { font-size: 1.4rem; }
+        header a { color: #fff; text-decoration: underline; font-size: 0.9rem; }
+
+        .card {
+            background: #fff; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 20px;
+        }
+        .card h2 { font-size: 1.05rem; margin-bottom: 14px; color: #374151; }
+
+        /* Upload */
+        .upload-area {
+            border: 2px dashed #cbd5e1; border-radius: 8px; padding: 28px;
+            text-align: center; cursor: pointer; transition: border-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.drag-over { border-color: #dc2626; background: #fef2f2; }
+        .upload-area input[type="file"] { display: none; }
+        .upload-area p { color: #64748b; font-size: 0.95rem; }
+        #upload-status { margin-top: 10px; font-size: 0.9rem; color: #16a34a; }
+
+        /* Document list */
+        .doc-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        .doc-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #e2e8f0; color: #6b7280; font-weight: 600; font-size: 0.85rem; }
+        .doc-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+        .doc-table tr:hover { background: #f9fafb; }
+        .doc-empty { text-align: center; color: #9ca3af; padding: 32px; }
+
+        /* Stats bar */
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 16px; }
+        .stat-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 20px; text-align: center; flex: 1; }
+        .stat-item .num { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+        .stat-item .label { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+
+        button {
+            padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; transition: background 0.2s;
+        }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-danger-outline { background: none; border: 1px solid #ef4444; color: #ef4444; }
+        .btn-danger-outline:hover { background: #fef2f2; }
+        .btn-reset { margin-top: 16px; }
+
+        footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1>🔧 管理画面</h1>
+            <small>ドキュメント管理</small>
+        </div>
+        <div style="text-align:right">
+            <a href="/">← ユーザー画面に戻る</a>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="num" id="stat-docs">-</div>
+            <div class="label">ドキュメント数</div>
+        </div>
+        <div class="stat-item">
+            <div class="num" id="stat-chunks">-</div>
+            <div class="label">チャンク数</div>
+        </div>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="card">
+        <h2>📄 ドキュメント登録</h2>
+        <div class="upload-area" id="drop-zone">
+            <p>ここにファイルをドラッグ＆ドロップ<br>またはクリックして選択<br><small>対応形式: .txt / .pdf / .docx / .xlsx</small></p>
+            <input type="file" id="file-input" accept=".txt,.pdf,.docx,.xlsx" multiple>
+        </div>
+        <div id="upload-status"></div>
+    </div>
+
+    <!-- Document List Card -->
+    <div class="card">
+        <h2>📋 登録済みドキュメント</h2>
+        <div id="doc-list"></div>
+        <button class="btn-danger btn-reset" onclick="resetAll()">⚠ 全ドキュメント削除</button>
+    </div>
+
+    <footer>管理者専用画面 — 認証が必要です</footer>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const uploadStatus = document.getElementById('upload-status');
+const docListEl = document.getElementById('doc-list');
+
+// ---------- Auth ----------
+let authHeader = '';
+
+function getAuth() {
+    if (authHeader) return authHeader;
+    const password = prompt('管理者パスワードを入力してください');
+    if (!password) {
+        location.href = '/';
+        return '';
+    }
+    authHeader = 'Basic ' + btoa('admin:' + password);
+    return authHeader;
+}
+
+async function authFetch(url, options = {}) {
+    const auth = getAuth();
+    if (!auth) return null;
+    options.headers = { ...options.headers, 'Authorization': auth };
+    const r = await fetch(url, options);
+    if (r.status === 401) {
+        authHeader = '';
+        alert('パスワードが正しくありません');
+        location.reload();
+        return null;
+    }
+    return r;
+}
+
+// ---------- Stats & Document List ----------
+async function loadData() {
+    // Stats (public API)
+    try {
+        const sr = await fetch('/api/stats');
+        const stats = await sr.json();
+        document.getElementById('stat-chunks').textContent = stats.total_chunks;
+    } catch {}
+
+    // Document list (admin API)
+    const r = await authFetch('/api/documents');
+    if (!r) return;
+    const docs = await r.json();
+    document.getElementById('stat-docs').textContent = docs.length;
+
+    if (docs.length === 0) {
+        docListEl.innerHTML = '<div class="doc-empty">ドキュメントが登録されていません</div>';
+        return;
+    }
+
+    let html = '<table class="doc-table"><thead><tr><th>ファイル名</th><th>チャンク数</th><th></th></tr></thead><tbody>';
+    for (const doc of docs) {
+        html += `<tr>
+            <td>${escapeHtml(doc.source)}</td>
+            <td>${doc.chunks}</td>
+            <td><button class="btn-danger-outline" onclick="deleteDoc('${escapeAttr(doc.source)}')">削除</button></td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    docListEl.innerHTML = html;
+}
+
+// ---------- Upload ----------
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+async function handleFiles(files) {
+    for (const file of files) {
+        uploadStatus.textContent = `⏳ アップロード中: ${file.name}...`;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+            const r = await authFetch('/api/upload', { method: 'POST', body: form });
+            if (!r) return;
+            const d = await r.json();
+            if (d.error) {
+                uploadStatus.textContent = `❌ ${d.error}`;
+            } else {
+                uploadStatus.textContent = `✅ ${d.filename} — ${d.chunks} チャンクに分割して登録`;
+            }
+        } catch (e) {
+            uploadStatus.textContent = `❌ アップロード失敗: ${e.message}`;
+        }
+    }
+    loadData();
+}
+
+// ---------- Delete ----------
+async function deleteDoc(source) {
+    if (!confirm(`「${source}」を削除しますか？`)) return;
+    const r = await authFetch(`/api/documents/${encodeURIComponent(source)}`, { method: 'DELETE' });
+    if (r && r.ok) {
+        uploadStatus.textContent = `${source} を削除しました`;
+        loadData();
+    }
+}
+
+async function resetAll() {
+    if (!confirm('全ドキュメントを削除しますか？この操作は取り消せません。')) return;
+    const r = await authFetch('/api/reset', { method: 'POST' });
+    if (r && r.ok) {
+        uploadStatus.textContent = '全ドキュメントを削除しました';
+        loadData();
+    }
+}
+
+// ---------- Util ----------
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function escapeAttr(s) {
+    return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ---------- Init ----------
+loadData();
+</script>
+</body>
+</html>
