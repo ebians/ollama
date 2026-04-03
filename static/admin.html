@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+<script>if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark')</script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -156,6 +157,49 @@
             display: inline-block; background: #64748b; color: #fff; font-size: 0.7rem;
             padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: middle;
         }
+
+        /* Theme toggle */
+        .theme-toggle {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 6px; cursor: pointer; font-size: 1.1rem; padding: 2px 8px;
+            line-height: 1; transition: background 0.2s;
+        }
+        .theme-toggle:hover { background: rgba(255,255,255,0.3); }
+
+        /* Dark Mode */
+        [data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+        [data-theme="dark"] .card { background: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        [data-theme="dark"] .card h2 { color: #cbd5e1; }
+        [data-theme="dark"] .stat-item { background: #1e293b; border-color: #334155; }
+        [data-theme="dark"] .stat-item .num { color: #e2e8f0; }
+        [data-theme="dark"] .stat-item .label { color: #94a3b8; }
+        [data-theme="dark"] .upload-area { border-color: #334155; }
+        [data-theme="dark"] .upload-area:hover,
+        [data-theme="dark"] .upload-area.drag-over { border-color: #dc2626; background: rgba(220,38,38,0.1); }
+        [data-theme="dark"] .upload-area p { color: #94a3b8; }
+        [data-theme="dark"] #upload-status { color: #22c55e; }
+        [data-theme="dark"] .doc-table th { border-bottom-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .doc-table td { border-bottom-color: #0f172a; color: #cbd5e1; }
+        [data-theme="dark"] .doc-table tr:hover { background: #334155; }
+        [data-theme="dark"] .doc-empty { color: #64748b; }
+        [data-theme="dark"] .login-overlay { background: rgba(0,0,0,0.7); }
+        [data-theme="dark"] .login-card { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        [data-theme="dark"] .login-card h2 { color: #e2e8f0; }
+        [data-theme="dark"] .login-card p { color: #94a3b8; }
+        [data-theme="dark"] .login-card input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .modal { background: #1e293b; }
+        [data-theme="dark"] .modal-header { border-bottom-color: #334155; }
+        [data-theme="dark"] .modal-header h3 { color: #e2e8f0; }
+        [data-theme="dark"] .modal-close { color: #94a3b8; }
+        [data-theme="dark"] .modal-close:hover { color: #e2e8f0; }
+        [data-theme="dark"] .chunk-card { background: #0f172a; border-color: #334155; }
+        [data-theme="dark"] .chunk-header { color: #94a3b8; }
+        [data-theme="dark"] .chunk-text { color: #cbd5e1; }
+        [data-theme="dark"] .user-form .field label { color: #94a3b8; }
+        [data-theme="dark"] .user-form .field input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .user-form .field input:focus { border-color: #2563eb; }
+        [data-theme="dark"] .user-form .field select { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] footer { color: #475569; }
     </style>
 </head>
 <body>
@@ -178,7 +222,10 @@
             <small>ドキュメント管理</small>
         </div>
         <div style="text-align:right">
-            <a href="/">← ユーザー画面に戻る</a>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                <a href="/">← ユーザー画面に戻る</a>
+                <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="テーマ切替">🌙</button>
+            </div>
             <div class="user-bar" id="user-bar" style="display:none; margin-top:4px; justify-content:flex-end;">
                 <span id="user-display" style="font-size:0.85rem;"></span>
                 <button class="logout-btn" onclick="doLogout()">ログアウト</button>
@@ -564,6 +611,20 @@ async function resetUserPassword(userId, username) {
         showUserMsg(e.detail || 'リセットに失敗しました', true);
     }
 }
+
+// ---------- Theme ----------
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const theme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    document.getElementById('theme-toggle').textContent = isDark ? '🌙' : '☀️';
+}
+(function initTheme() {
+    if (localStorage.getItem('theme') === 'dark') {
+        document.getElementById('theme-toggle').textContent = '☀️';
+    }
+})();
 
 // ---------- Init ----------
 checkAuth();

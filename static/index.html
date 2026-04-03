@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+<script>if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark')</script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -173,6 +174,48 @@
             font-size: 0.85rem; background: #fff; color: #1e293b; outline: none; max-width: 300px;
         }
         .model-row select:focus { border-color: #2563eb; }
+
+        /* Theme toggle */
+        .theme-toggle {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 6px; cursor: pointer; font-size: 1.1rem; padding: 2px 8px;
+            line-height: 1; transition: background 0.2s;
+        }
+        .theme-toggle:hover { background: rgba(255,255,255,0.3); }
+        .btn-cancel { background: #e2e8f0; color: #374151; border: none; cursor: pointer; }
+
+        /* Dark Mode */
+        [data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+        [data-theme="dark"] .sidebar { background: #020617; }
+        [data-theme="dark"] .sidebar-btn { border-color: #334155; }
+        [data-theme="dark"] .session-item { color: #94a3b8; }
+        [data-theme="dark"] .session-item:hover { background: #1e293b; }
+        [data-theme="dark"] .card { background: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        [data-theme="dark"] .card h2 { color: #cbd5e1; }
+        [data-theme="dark"] .msg.assistant { background: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .msg.assistant code { background: #475569; color: #e2e8f0; }
+        [data-theme="dark"] .msg.assistant th { background: #334155; }
+        [data-theme="dark"] .msg.assistant th,
+        [data-theme="dark"] .msg.assistant td { border-color: #475569; color: #e2e8f0; }
+        [data-theme="dark"] .msg .sources { color: #94a3b8; }
+        [data-theme="dark"] .input-row input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .input-row input:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.3); }
+        [data-theme="dark"] .mode-btn { background: #0f172a; border-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .mode-btn:hover { border-color: #475569; color: #e2e8f0; }
+        [data-theme="dark"] .mode-btn.active { border-color: #2563eb; background: rgba(37,99,235,0.2); color: #60a5fa; }
+        [data-theme="dark"] .model-row select { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .model-row label { color: #94a3b8; }
+        [data-theme="dark"] .login-overlay { background: rgba(0,0,0,0.7); }
+        [data-theme="dark"] .login-card { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        [data-theme="dark"] .login-card h2 { color: #e2e8f0; }
+        [data-theme="dark"] .login-card p { color: #94a3b8; }
+        [data-theme="dark"] .login-card input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .pw-overlay { background: rgba(0,0,0,0.7); }
+        [data-theme="dark"] .pw-card { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        [data-theme="dark"] .pw-card h3 { color: #e2e8f0; }
+        [data-theme="dark"] .pw-card input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .btn-cancel { background: #334155; color: #e2e8f0; }
+        [data-theme="dark"] footer { color: #475569; }
     </style>
 </head>
 <body>
@@ -201,7 +244,10 @@
             <small>Ollama + ChromaDB</small>
         </div>
         <div style="text-align:right">
-            <div id="stats">読み込み中...</div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:2px">
+                <span id="stats">読み込み中...</span>
+                <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="テーマ切替">🌙</button>
+            </div>
             <div class="user-info" id="user-info" style="display:none; margin-top:4px; justify-content:flex-end;">
                 <span class="username" id="user-display"></span>
                 <button class="pw-btn" onclick="showPasswordModal()">PW変更</button>
@@ -242,7 +288,7 @@
         <input type="password" id="pw-new" placeholder="新しいパスワード（4文字以上）" autocomplete="new-password">
         <input type="password" id="pw-confirm" placeholder="新しいパスワード（確認）" autocomplete="new-password">
         <div class="pw-actions">
-            <button style="background:#e2e8f0;color:#374151;border:none;cursor:pointer" onclick="closePasswordModal()">キャンセル</button>
+            <button class="btn-cancel" onclick="closePasswordModal()">キャンセル</button>
             <button class="btn-primary" style="border:none;cursor:pointer" onclick="doChangePassword()">変更</button>
         </div>
         <div class="pw-msg" id="pw-msg"></div>
@@ -586,6 +632,20 @@ async function deleteSessionUI(sessionId) {
 }
 
 loadSessions();
+
+// ---------- Theme ----------
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const theme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    document.getElementById('theme-toggle').textContent = isDark ? '🌙' : '☀️';
+}
+(function initTheme() {
+    if (localStorage.getItem('theme') === 'dark') {
+        document.getElementById('theme-toggle').textContent = '☀️';
+    }
+})();
 
 // ---------- Init ----------
 checkAuth();
