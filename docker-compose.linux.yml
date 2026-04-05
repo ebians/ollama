@@ -1,0 +1,73 @@
+# Linux 本番デプロイ用 docker-compose
+#
+# ホスト側の /data/LLM にモデルを事前配置する構成。
+# docker exec ollama ollama pull が使えない閉域網でも運用可能。
+#
+# --- モデルの事前配置 ---
+# 1) インターネット接続のあるマシンで Ollama を使いモデルを取得:
+#      ollama pull qwen2.5:7b
+#      ollama pull nomic-embed-text
+#
+# 2) モデルファイルをコピー:
+#      Linux:   ~/.ollama/models  → DVIAPS01:/data/LLM/models
+#      Windows: %USERPROFILE%\.ollama\models → USB 等で転送
+#
+#    ディレクトリ構成例:
+#      /data/LLM/
+#      └── models/
+#          ├── blobs/
+#          │   └── sha256-...
+#          └── manifests/
+#              └── registry.ollama.ai/
+#                  └── library/
+#                      ├── qwen2.5/
+#                      └── nomic-embed-text/
+#
+# --- 起動 ---
+#   docker compose -f docker-compose.linux.yml up -d
+#
+# --- 確認 ---
+#   docker exec ollama ollama list
+#
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # ホスト /data/LLM をコンテナの Ollama モデル格納先にバインドマウント
+      - /data/LLM:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-app
+    ports:
+      - "127.0.0.1:8000:8000"   # Caddy 経由のみ公開するため localhost に限定
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CHAT_MODEL=qwen2.5:7b
+      - EMBED_MODEL=nomic-embed-text
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - CHROMA_DIR=/data/chroma_data
+      - CHAT_DB_PATH=/data/chat_history.db
+      - RATE_LIMIT_PER_MINUTE=20
+    volumes:
+      - app_data:/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  app_data:

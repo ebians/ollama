@@ -1,0 +1,50 @@
+# Linux 本番デプロイ用 Caddyfile
+#
+# DVIAPS01 サーバーで Caddy をリバースプロキシとして使う構成。
+# Docker の app コンテナ (127.0.0.1:8000) へプロキシ。
+#
+# --- インストール ---
+#   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
+#     sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
+#     sudo tee /etc/apt/sources.list.d/caddy-stable.list
+#   sudo apt update && sudo apt install caddy
+#
+# --- 使い方 ---
+#   sudo cp Caddyfile.linux /etc/caddy/Caddyfile
+#   sudo systemctl restart caddy
+#
+# --- ログ確認 ---
+#   journalctl -u caddy -f
+
+# ==============================================================
+# パターン A: HTTP のみ（社内 LAN、証明書不要）
+# ==============================================================
+http://DVIAPS01 {
+	reverse_proxy 127.0.0.1:8000 {
+		flush_interval -1
+	}
+}
+
+# ==============================================================
+# パターン B: HTTPS（自己署名証明書 — 閉域網向け）
+# CA 不要で暗号化通信を実現。ブラウザの証明書警告が出る。
+# パターン A と同時に使う場合はパターン A をコメントアウト。
+# ==============================================================
+# https://DVIAPS01 {
+# 	tls internal
+# 	reverse_proxy 127.0.0.1:8000 {
+# 		flush_interval -1
+# 	}
+# }
+
+# ==============================================================
+# パターン C: HTTPS（Let's Encrypt — インターネット公開時）
+# DNS が解決でき、ポート 80/443 が外部到達可能な場合に自動証明書。
+# ==============================================================
+# rag.example.com {
+# 	reverse_proxy 127.0.0.1:8000 {
+# 		flush_interval -1
+# 	}
+# }
