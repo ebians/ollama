@@ -1,4 +1,4 @@
-# Linux 本番デプロイ用 docker-compose
+﻿# Linux 本番デプロイ用 docker-compose
 #
 # ホスト側の /data/LLM にモデルを事前配置する構成。
 # docker exec ollama ollama pull が使えない閉域網でも運用可能。
@@ -9,7 +9,7 @@
 #      ollama pull nomic-embed-text
 #
 # 2) モデルファイルをコピー:
-#      Linux:   ~/.ollama/models  → DVIAPS01:/data/LLM/models
+#      Linux:   ~/.ollama/models  → APPSERVER:/data/LLM/models
 #      Windows: %USERPROFILE%\.ollama\models → USB 等で転送
 #
 #    ディレクトリ構成例:

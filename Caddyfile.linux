@@ -1,12 +1,12 @@
-# Linux 本番デプロイ用 Caddyfile
+﻿# Linux 本番デプロイ用 Caddyfile
 #
-# DVIAPS01 サーバーで Caddy をリバースプロキシとして使う構成。
+# APPSERVER サーバーで Caddy をリバースプロキシとして使う構成。
 # Docker の app コンテナ (127.0.0.1:8000) へプロキシ。
 #
 # サブパス配下でアプリを公開し、将来的に複数アプリを並べる想定:
-#   http://DVIAPS01/shinkollm  → 社内RAGアシスタント (:8000)
-#   http://DVIAPS01/app01      → 将来のアプリ (:8001)
-#   http://DVIAPS01/app02      → 将来のアプリ (:8002)
+#   http://APPSERVER/shinkollm  → 社内RAGアシスタント (:8000)
+#   http://APPSERVER/app01      → 将来のアプリ (:8001)
+#   http://APPSERVER/app02      → 将来のアプリ (:8002)
 #
 # --- インストール ---
 #   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -23,7 +23,7 @@
 # --- ログ確認 ---
 #   journalctl -u caddy -f
 
-http://DVIAPS01 {
+http://APPSERVER {
 	# === 社内RAGアシスタント ===
 	# /shinkollm → /shinkollm/ にリダイレクト（末尾スラッシュ統一）
 	redir /shinkollm /shinkollm/ permanent
@@ -51,5 +51,5 @@ http://DVIAPS01 {
 	# }
 
 	# ルートへのアクセス時にアプリ一覧を表示（任意）
-	respond / "DVIAPS01 - Available Apps: /shinkollm" 200
+	respond / "APPSERVER - Available Apps: /shinkollm" 200
 }
