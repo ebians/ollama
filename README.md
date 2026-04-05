@@ -517,10 +517,14 @@ docker compose up -d
 | GPU (VRAM) | モデル | サイズ | ライセンス | 特徴 |
 |---|---|---|---|---|
 | **8GB** (RTX 3070 Ti 等) | `qwen2.5:7b` | 4.7 GB | Apache 2.0 | 当プロジェクトのデフォルト。日本語十分実用的 |
+| **8GB** | `qwen3:8b` | 5.2 GB | Apache 2.0 | 最新世代。thinking mode（推論強化）内蔵。qwen2.5:7b より高性能 |
 | **8GB** | `gemma3:4b` | 3.3 GB | Gemma | 軽量でレスポンスが速い |
 | **12GB** (RTX 3060 12GB 等) | `qwen2.5:14b` | 9.0 GB | Apache 2.0 | 7B より回答品質が向上 |
+| **12GB** | `qwen3:14b` | 9.3 GB | Apache 2.0 | 最新世代。thinking mode対応。同サイズ最高クラスの性能 |
 | **16GB** (RTX 4080 等) | `qwen2.5:32b-q4_K_M` | ~18 GB | Apache 2.0 | 大幅に高品質。長文の理解力が高い |
 | **24GB** (RTX 4090 等) | `qwen2.5:32b` | 20 GB | Apache 2.0 | 32B フル精度 |
+| **24GB** | `qwen3:32b` | 20 GB | Apache 2.0 | 最新世代32B dense。thinking mode対応。高い推論精度 |
+| **24GB** | `qwen3:30b` | 19 GB | Apache 2.0 | MoE（実効3B相当）。256K コンテキスト対応。高速軽量 |
 | **24GB** | `deepseek-r1:32b` | 20 GB | MIT | 推論特化。複雑な質問に強い |
 | **48GB** (RTX 6000 Pro 等) | `qwen2.5:72b-q4_K_M` | ~42 GB | Apache 2.0 | 72B 量子化。専門的な質問にも高精度な回答 |
 | **48GB** | `deepseek-r1:70b-q4_K_M` | ~43 GB | MIT | 70B 推論特化。論理的思考が得意 |
@@ -528,10 +532,13 @@ docker compose up -d
 | **96GB** | `deepseek-r1:70b` | 40 GB | MIT | 70B フル精度。推論・論理的思考が最も正確 |
 | **141GB** (H200 等) | `qwen2.5:72b` | 45 GB | Apache 2.0 | 72B フル精度。最高品質の日本語回答 |
 | **141GB** | `deepseek-r1:671b-q4_K_M` | ~404 GB | MIT | MoE 671B。推論特化最強（複数GPU推奨） |
+| **141GB×2+** (2x H200 等) | `qwen3:235b` | 142 GB | Apache 2.0 | MoE（実効22B）。Qwen3 最大モデル。256K コンテキスト |
 
+> **Qwen3 について:** Qwen 系の最新世代（Apache 2.0）。thinking mode（`/think`・`/no_think` で切替）が内蔵されており、数学・コーディング・推論タスクで従来比大幅向上。**特に `qwen3:8b` は `qwen2.5:7b` より高性能で同 VRAM で動作するため、新規構築なら推奨。**  
+>
 > **RTX 6000 Pro (48GB)** のおすすめ: `qwen2.5:72b-q4_K_M` がベストバランス。Embedding (`nomic-embed-text` 0.3GB) と合わせても約 42GB で収まります。  
 > **RTX PRO 6000 Blackwell (96GB)** のおすすめ: `qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で約 46GB。VRAM に大きな余裕があります。  
-> **H200 (141GB HBM3e)** は VRAM に余裕があるため、`qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で最高品質の構成が可能です。`deepseek-r1:671b` は複数 GPU での分散推論が前提です。
+> **H200 (141GB HBM3e)** は VRAM に余裕があるため、`qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で最高品質の構成が可能です。`deepseek-r1:671b` は複数 GPU での分散推論が前提です。`qwen3:235b` は 142GB のため 2x H200 (NVLink) が必要です。
 >
 > **ライセンス補足:**  
 > - **Apache 2.0 / MIT**: 制約なし。商用利用・改変・再配布すべて自由  
