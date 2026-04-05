@@ -4,7 +4,7 @@
 # Docker の app コンテナ (127.0.0.1:8000) へプロキシ。
 #
 # サブパス配下でアプリを公開し、将来的に複数アプリを並べる想定:
-#   http://APPSERVER/shinkollm  → 社内RAGアシスタント (:8000)
+#   http://APPSERVER/myllm  → 社内RAGアシスタント (:8000)
 #   http://APPSERVER/app01      → 将来のアプリ (:8001)
 #   http://APPSERVER/app02      → 将来のアプリ (:8002)
 #
@@ -25,11 +25,11 @@
 
 http://APPSERVER {
 	# === 社内RAGアシスタント ===
-	# /shinkollm → /shinkollm/ にリダイレクト（末尾スラッシュ統一）
-	redir /shinkollm /shinkollm/ permanent
+	# /myllm → /myllm/ にリダイレクト（末尾スラッシュ統一）
+	redir /myllm /myllm/ permanent
 
-	# /shinkollm/* のプレフィクスを除去してバックエンドへ転送
-	handle_path /shinkollm/* {
+	# /myllm/* のプレフィクスを除去してバックエンドへ転送
+	handle_path /myllm/* {
 		reverse_proxy 127.0.0.1:8000 {
 			flush_interval -1
 		}
@@ -51,5 +51,5 @@ http://APPSERVER {
 	# }
 
 	# ルートへのアクセス時にアプリ一覧を表示（任意）
-	respond / "APPSERVER - Available Apps: /shinkollm" 200
+	respond / "APPSERVER - Available Apps: /myllm" 200
 }

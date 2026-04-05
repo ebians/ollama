@@ -680,11 +680,11 @@ docker exec ollama ollama list
 
 ### 3. Caddy 設定（サブパスデプロイ）
 
-`Caddyfile.linux` は `http://APPSERVER/shinkollm/` のようにサブパス配下でアプリを公開する構成です。  
+`Caddyfile.linux` は `http://APPSERVER/myllm/` のようにサブパス配下でアプリを公開する構成です。  
 将来的に複数アプリを並べて運用できます。
 
 ```
-http://APPSERVER/shinkollm/       → 社内RAGアシスタント (:8000)
+http://APPSERVER/myllm/       → 社内RAGアシスタント (:8000)
 http://APPSERVER/app01/           → 将来のアプリ (:8001)
 http://APPSERVER/app02/           → 将来のアプリ (:8002)
 ```
@@ -696,13 +696,13 @@ sudo systemctl enable caddy
 sudo systemctl restart caddy
 
 # 動作確認
-curl http://APPSERVER/shinkollm/api/stats
+curl http://APPSERVER/myllm/api/stats
 ```
 
 社内の他のマシンから以下のアドレスでアクセスできます：
 
-- ユーザー画面: **http://APPSERVER/shinkollm/**
-- 管理画面: **http://APPSERVER/shinkollm/admin**
+- ユーザー画面: **http://APPSERVER/myllm/**
+- 管理画面: **http://APPSERVER/myllm/admin**
 
 > **ローカル開発時**は従来通り `http://localhost:8000` で動作します（サブパスなし）。  
 > HTML 側で URL パスを自動検出するため、コードの切り替えは不要です。
