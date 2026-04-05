@@ -3,6 +3,11 @@
 # DVIAPS01 サーバーで Caddy をリバースプロキシとして使う構成。
 # Docker の app コンテナ (127.0.0.1:8000) へプロキシ。
 #
+# サブパス配下でアプリを公開し、将来的に複数アプリを並べる想定:
+#   http://DVIAPS01/shinkollm  → 社内RAGアシスタント (:8000)
+#   http://DVIAPS01/app01      → 将来のアプリ (:8001)
+#   http://DVIAPS01/app02      → 将来のアプリ (:8002)
+#
 # --- インストール ---
 #   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 #   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
@@ -18,33 +23,33 @@
 # --- ログ確認 ---
 #   journalctl -u caddy -f
 
-# ==============================================================
-# パターン A: HTTP のみ（社内 LAN、証明書不要）
-# ==============================================================
 http://DVIAPS01 {
-	reverse_proxy 127.0.0.1:8000 {
-		flush_interval -1
+	# === 社内RAGアシスタント ===
+	# /shinkollm → /shinkollm/ にリダイレクト（末尾スラッシュ統一）
+	redir /shinkollm /shinkollm/ permanent
+
+	# /shinkollm/* のプレフィクスを除去してバックエンドへ転送
+	handle_path /shinkollm/* {
+		reverse_proxy 127.0.0.1:8000 {
+			flush_interval -1
+		}
 	}
+
+	# === 将来のアプリ例 ===
+	# redir /app01 /app01/ permanent
+	# handle_path /app01/* {
+	# 	reverse_proxy 127.0.0.1:8001 {
+	# 		flush_interval -1
+	# 	}
+	# }
+
+	# redir /app02 /app02/ permanent
+	# handle_path /app02/* {
+	# 	reverse_proxy 127.0.0.1:8002 {
+	# 		flush_interval -1
+	# 	}
+	# }
+
+	# ルートへのアクセス時にアプリ一覧を表示（任意）
+	respond / "DVIAPS01 - Available Apps: /shinkollm" 200
 }
-
-# ==============================================================
-# パターン B: HTTPS（自己署名証明書 — 閉域網向け）
-# CA 不要で暗号化通信を実現。ブラウザの証明書警告が出る。
-# パターン A と同時に使う場合はパターン A をコメントアウト。
-# ==============================================================
-# https://DVIAPS01 {
-# 	tls internal
-# 	reverse_proxy 127.0.0.1:8000 {
-# 		flush_interval -1
-# 	}
-# }
-
-# ==============================================================
-# パターン C: HTTPS（Let's Encrypt — インターネット公開時）
-# DNS が解決でき、ポート 80/443 が外部到達可能な場合に自動証明書。
-# ==============================================================
-# rag.example.com {
-# 	reverse_proxy 127.0.0.1:8000 {
-# 		flush_interval -1
-# 	}
-# }

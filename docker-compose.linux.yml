@@ -14,14 +14,13 @@
 #
 #    ディレクトリ構成例:
 #      /data/LLM/
-#      └── models/
-#          ├── blobs/
-#          │   └── sha256-...
-#          └── manifests/
-#              └── registry.ollama.ai/
-#                  └── library/
-#                      ├── qwen2.5/
-#                      └── nomic-embed-text/
+#      ├── blobs/
+#      │   └── sha256-...
+#      └── manifests/
+#          └── registry.ollama.ai/
+#              └── library/
+#                  ├── qwen2.5/
+#                  └── nomic-embed-text/
 #
 # --- 起動 ---
 #   docker compose -f docker-compose.linux.yml up -d

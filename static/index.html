@@ -273,7 +273,7 @@
                 <button class="btn-export" onclick="exportChat()" id="export-btn" style="display:none">⬇ エクスポート</button>
                 <button class="logout-btn" onclick="doLogout()">ログアウト</button>
             </div>
-            <a href="/admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px" id="admin-link" class="hidden">管理画面</a>
+            <a href="admin" style="color:#fff;font-size:0.8rem;opacity:0.7;text-decoration:underline;display:inline-block;margin-top:4px" id="admin-link" class="hidden">管理画面</a>
         </div>
     </header>
 
@@ -326,6 +326,14 @@ let currentMode = 'rag';
 let currentSessionId = '';  // 現在のセッションID
 let currentUser = null;
 let currentModel = '';  // 空ならデフォルト
+
+// Base path for subpath deployment (e.g., /shinkollm)
+const BASE = window.location.pathname.replace(/\/(admin)?$/, '');
+const _fetch = window.fetch;
+window.fetch = function(url, ...args) {
+    if (typeof url === 'string' && url.startsWith('/')) url = BASE + url;
+    return _fetch.call(this, url, ...args);
+};
 
 // ---------- Auth ----------
 async function checkAuth() {
@@ -583,7 +591,7 @@ function updateExportBtn() {
 
 function exportChat() {
     if (!currentSessionId) return;
-    window.open(`/api/sessions/${currentSessionId}/export`, '_blank');
+    window.open(BASE + `/api/sessions/${currentSessionId}/export`, '_blank');
 }
 
 function appendMsg(role, text) {

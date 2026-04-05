@@ -242,7 +242,7 @@
         </div>
         <div style="text-align:right">
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
-                <a href="/">← ユーザー画面に戻る</a>
+                <a href="./">← ユーザー画面に戻る</a>
                 <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="テーマ切替">🌙</button>
             </div>
             <div class="user-bar" id="user-bar" style="display:none; margin-top:4px; justify-content:flex-end;">
@@ -359,6 +359,14 @@ const docListEl = document.getElementById('doc-list');
 
 let allDocs = []; // フィルタ用に全ドキュメントを保持
 
+// Base path for subpath deployment (e.g., /shinkollm)
+const BASE = window.location.pathname.replace(/\/(admin)?$/, '');
+const _fetch = window.fetch;
+window.fetch = function(url, ...args) {
+    if (typeof url === 'string' && url.startsWith('/')) url = BASE + url;
+    return _fetch.call(this, url, ...args);
+};
+
 // ---------- Auth ----------
 async function checkAuth() {
     try {
@@ -371,7 +379,7 @@ async function checkAuth() {
             loadData();
         } else if (data.user) {
             alert('管理者権限が必要です');
-            location.href = '/';
+            location.href = BASE || '/';
         } else {
             document.getElementById('login-overlay').classList.remove('hidden');
         }
