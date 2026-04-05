@@ -519,8 +519,17 @@ docker compose up -d
 | **12GB** (RTX 3060 12GB 等) | `qwen2.5:14b` | 9.0 GB | 7B より回答品質が向上 |
 | **16GB** (RTX 4080 等) | `qwen2.5:32b-q4_K_M` | ~18 GB | 大幅に高品質。長文の理解力が高い |
 | **24GB** (RTX 4090 等) | `qwen2.5:32b` | 20 GB | 32B フル精度 |
-| **24GB** | `deepseek-r1:32b` | 20 GB | 推論特化。複雑な質問に強い |
+| **24GB** | `deepseek-r1:32b` | 20 GB | 推論特化。複雑な質問に強い || **48GB** (RTX 6000 Pro 等) | `qwen2.5:72b-q4_K_M` | ~42 GB | 72B 量子化。専門的な質啎にも高精度な回答 |
+| **48GB** | `llama3.1:70b-q4_K_M` | ~40 GB | Meta製 70B。英語・日本語両方強い |
+| **48GB** | `deepseek-r1:70b-q4_K_M` | ~43 GB | 70B 推論特化。論理的思考が得意 |
+| **48GB** | `command-r:35b` | ~21 GB | RAG 特化モデル。検索拡張生成に最適 |
+| **141GB** (H200 等) | `qwen2.5:72b` | 45 GB | 72B フル精度。最高品質の日本語回答 |
+| **141GB** | `llama3.1:405b-q4_K_M` | ~230 GB | Meta製最大。GPT-4級の性能 |
+| **141GB** | `deepseek-r1:671b-q4_K_M` | ~404 GB | MoE 671B。推論特化最強（複数GPU推奨） |
+| **141GB** | `qwen2.5:72b` + `command-r:35b` | ~80 GB | 併用構成。業務回答 + RAG検索を分担 |
 
+> **RTX 6000 Pro (48GB)** のおすすめ: `qwen2.5:72b-q4_K_M` がベストバランス。Embedding (`nomic-embed-text` 0.3GB) と合わせても約 42GB で収まります。  
+> **H200 (141GB HBM3e)** は VRAM に余裕があるため、`qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で最高品質の構成が可能です。さらに大きな 405B / 671B は複数 GPU での分散推論が前提です。
 ### Embedding モデルの差し替え
 
 Embedding モデルも同様に差し替え可能です。ただし **変更後は DB リセット＋再登録が必要** です（ベクトルの次元数が異なるため）。
@@ -663,7 +672,16 @@ docker exec ollama ollama list
 # → qwen2.5:7b, nomic-embed-text が表示されれば OK
 ```
 
-### 3. Caddy 設定
+### 3. Caddy 設定（サブパスデプロイ）
+
+`Caddyfile.linux` は `http://DVIAPS01/shinkollm/` のようにサブパス配下でアプリを公開する構成です。  
+将来的に複数アプリを並べて運用できます。
+
+```
+http://DVIAPS01/shinkollm/       → 社内RAGアシスタント (:8000)
+http://DVIAPS01/app01/           → 将来のアプリ (:8001)
+http://DVIAPS01/app02/           → 将来のアプリ (:8002)
+```
 
 ```bash
 # Caddyfile を配置
@@ -672,10 +690,16 @@ sudo systemctl enable caddy
 sudo systemctl restart caddy
 
 # 動作確認
-curl http://DVIAPS01/api/stats
+curl http://DVIAPS01/shinkollm/api/stats
 ```
 
-社内の他のマシンから **http://DVIAPS01** でアクセスできます。
+社内の他のマシンから以下のアドレスでアクセスできます：
+
+- ユーザー画面: **http://DVIAPS01/shinkollm/**
+- 管理画面: **http://DVIAPS01/shinkollm/admin**
+
+> **ローカル開発時**は従来通り `http://localhost:8000` で動作します（サブパスなし）。  
+> HTML 側で URL パスを自動検出するため、コードの切り替えは不要です。
 
 ### 4. モデルの追加・更新
 
