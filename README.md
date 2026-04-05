@@ -519,16 +519,22 @@ docker compose up -d
 | **12GB** (RTX 3060 12GB 等) | `qwen2.5:14b` | 9.0 GB | 7B より回答品質が向上 |
 | **16GB** (RTX 4080 等) | `qwen2.5:32b-q4_K_M` | ~18 GB | 大幅に高品質。長文の理解力が高い |
 | **24GB** (RTX 4090 等) | `qwen2.5:32b` | 20 GB | 32B フル精度 |
-| **24GB** | `deepseek-r1:32b` | 20 GB | 推論特化。複雑な質問に強い || **48GB** (RTX 6000 Pro 等) | `qwen2.5:72b-q4_K_M` | ~42 GB | 72B 量子化。専門的な質啎にも高精度な回答 |
+| **24GB** | `deepseek-r1:32b` | 20 GB | 推論特化。複雑な質問に強い |
+| **48GB** (RTX 6000 Pro 等) | `qwen2.5:72b-q4_K_M` | ~42 GB | 72B 量子化。専門的な質問にも高精度な回答 |
 | **48GB** | `llama3.1:70b-q4_K_M` | ~40 GB | Meta製 70B。英語・日本語両方強い |
 | **48GB** | `deepseek-r1:70b-q4_K_M` | ~43 GB | 70B 推論特化。論理的思考が得意 |
 | **48GB** | `command-r:35b` | ~21 GB | RAG 特化モデル。検索拡張生成に最適 |
+| **96GB** (RTX PRO 6000 Blackwell) | `qwen2.5:72b` | 45 GB | 72B フル精度。量子化なしで最高品質 |
+| **96GB** | `llama3.1:70b` | 40 GB | 70B フル精度。日英バイリンガル性能が最大化 |
+| **96GB** | `deepseek-r1:70b` | 40 GB | 70B フル精度。推論・論理的思考が最も正確 |
+| **96GB** | `qwen2.5:72b` + `command-r:35b` | ~80 GB | 併用構成。業務回答 + RAG検索を分担 |
 | **141GB** (H200 等) | `qwen2.5:72b` | 45 GB | 72B フル精度。最高品質の日本語回答 |
 | **141GB** | `llama3.1:405b-q4_K_M` | ~230 GB | Meta製最大。GPT-4級の性能 |
 | **141GB** | `deepseek-r1:671b-q4_K_M` | ~404 GB | MoE 671B。推論特化最強（複数GPU推奨） |
 | **141GB** | `qwen2.5:72b` + `command-r:35b` | ~80 GB | 併用構成。業務回答 + RAG検索を分担 |
 
 > **RTX 6000 Pro (48GB)** のおすすめ: `qwen2.5:72b-q4_K_M` がベストバランス。Embedding (`nomic-embed-text` 0.3GB) と合わせても約 42GB で収まります。  
+> **RTX PRO 6000 Blackwell (96GB)** のおすすめ: `qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で約 46GB。VRAM に大きな余裕があるため、`command-r:35b` を追加した併用構成 (~80GB) も余裕で動作します。  
 > **H200 (141GB HBM3e)** は VRAM に余裕があるため、`qwen2.5:72b` フル精度 + `mxbai-embed-large` (0.7GB) で最高品質の構成が可能です。さらに大きな 405B / 671B は複数 GPU での分散推論が前提です。
 ### Embedding モデルの差し替え
 
