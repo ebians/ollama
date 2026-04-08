@@ -109,7 +109,7 @@
         .btn-danger:hover { background: #dc2626; }
 
         /* Mode selector */
-        .mode-selector { display: flex; gap: 6px; margin-bottom: 12px; }
+        .mode-selector { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
         .mode-btn {
             padding: 6px 14px; border: 2px solid #e2e8f0; border-radius: 20px;
             background: #fff; color: #64748b; font-size: 0.85rem; font-weight: 500;
@@ -117,6 +117,17 @@
         }
         .mode-btn:hover { border-color: #94a3b8; color: #334155; }
         .mode-btn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+        .mode-toggle-detail {
+            background: none; border: none; color: #94a3b8; font-size: 0.8rem;
+            cursor: pointer; padding: 4px 8px; text-decoration: underline;
+        }
+        .mode-toggle-detail:hover { color: #475569; }
+        .mode-detail { display: none; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+        .mode-detail.open { display: flex; }
+        .mode-indicator {
+            display: inline-block; font-size: 0.8rem; color: #64748b; margin-bottom: 4px;
+            padding: 2px 10px; background: #f1f5f9; border-radius: 12px;
+        }
 
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #93c5fd; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -220,6 +231,9 @@
         [data-theme="dark"] .mode-btn { background: #0f172a; border-color: #334155; color: #94a3b8; }
         [data-theme="dark"] .mode-btn:hover { border-color: #475569; color: #e2e8f0; }
         [data-theme="dark"] .mode-btn.active { border-color: #2563eb; background: rgba(37,99,235,0.2); color: #60a5fa; }
+        [data-theme="dark"] .mode-toggle-detail { color: #64748b; }
+        [data-theme="dark"] .mode-toggle-detail:hover { color: #94a3b8; }
+        [data-theme="dark"] .mode-indicator { background: #1e293b; color: #94a3b8; }
         [data-theme="dark"] .model-row select { background: #0f172a; border-color: #334155; color: #e2e8f0; }
         [data-theme="dark"] .model-row label { color: #94a3b8; }
         [data-theme="dark"] .login-overlay { background: rgba(0,0,0,0.7); }
@@ -281,13 +295,17 @@
     <div class="card">
         <h2>💬 質問する</h2>
         <div class="mode-selector">
-            <button class="mode-btn active" data-mode="rag" onclick="setMode('rag', this)">📄 RAGモード</button>
+            <button class="mode-btn active" data-mode="auto" onclick="setMode('auto', this)">🤖 自動</button>
+            <button class="mode-btn" data-mode="rag" onclick="setMode('rag', this)">📄 RAG</button>
             <button class="mode-btn" data-mode="hybrid" onclick="setMode('hybrid', this)">🔀 ハイブリッド</button>
+            <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリー</button>
+            <button class="mode-toggle-detail" onclick="toggleModeDetail()">▶ 専門モード</button>
+        </div>
+        <div class="mode-detail" id="mode-detail">
             <button class="mode-btn" data-mode="stepwise" onclick="setMode('stepwise', this)">🧠 段階的推論</button>
             <button class="mode-btn" data-mode="multimodal" onclick="setMode('multimodal', this)">🖼️ 図表読取</button>
             <button class="mode-btn" data-mode="calculate" onclick="setMode('calculate', this)">🔢 数値計算</button>
             <button class="mode-btn" data-mode="consistency" onclick="setMode('consistency', this)">⚖️ 整合性</button>
-            <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリーチャット</button>
         </div>
         <div class="model-row">
             <label for="model-select">🤖 モデル:</label>
@@ -326,7 +344,7 @@ const askBtn = document.getElementById('ask-btn');
 const statsEl = document.getElementById('stats');
 
 let chatHistory = []; // 会話履歴 [{role, content}, ...]
-let currentMode = 'rag';
+let currentMode = 'auto';
 let currentSessionId = '';  // 現在のセッションID
 let currentUser = null;
 let currentModel = '';  // 空ならデフォルト
@@ -465,6 +483,7 @@ function setMode(mode, btn) {
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const placeholders = {
+        auto: '質問を入力すると、AIが最適なモードを自動選択します...',
         rag: '社内ドキュメントについて質問...',
         hybrid: '社内文書 + 一般知識で回答...',
         stepwise: '複雑文書を段階的に分析して回答...',
@@ -473,8 +492,20 @@ function setMode(mode, btn) {
         consistency: '文書間の矛盾・不一致を検出...',
         free: '何でも質問してください...'
     };
-    questionInput.placeholder = placeholders[mode] || placeholders.rag;
+    questionInput.placeholder = placeholders[mode] || placeholders.auto;
 }
+
+function toggleModeDetail() {
+    const el = document.getElementById('mode-detail');
+    const btn = document.querySelector('.mode-toggle-detail');
+    const isOpen = el.classList.toggle('open');
+    btn.textContent = isOpen ? '▼ 専門モード' : '▶ 専門モード';
+}
+
+const MODE_LABELS = {
+    rag: '📄 RAGモード', hybrid: '🔀 ハイブリッド', stepwise: '🧠 段階的推論',
+    multimodal: '🖼️ 図表読取', calculate: '🔢 数値計算', consistency: '⚖️ 整合性', free: '💭 フリーチャット'
+};
 
 // ---------- Stats ----------
 async function loadStats() {
@@ -549,6 +580,13 @@ async function ask() {
                     const msg = JSON.parse(payload);
                     if (msg.type === 'session_id') {
                         currentSessionId = msg.session_id;
+                    } else if (msg.type === 'resolved_mode') {
+                        // Auto モードの場合、どのモードに振り分けられたか表示
+                        const label = MODE_LABELS[msg.mode] || msg.mode;
+                        const indicator = document.createElement('div');
+                        indicator.className = 'mode-indicator';
+                        indicator.textContent = `${label} で回答`;
+                        loadingEl.parentElement.insertBefore(indicator, loadingEl);
                     } else if (msg.type === 'sources') {
                         sources = msg.sources || [];
                     } else if (msg.type === 'token') {

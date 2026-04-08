@@ -9,7 +9,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.config import ADMIN_PASSWORD
-from app.ollama_client import chat_completion, chat_completion_stream, chat_completion_vision_stream, list_models, generate_summary_and_faq
+from app.ollama_client import chat_completion, chat_completion_stream, chat_completion_vision_stream, list_models, generate_summary_and_faq, classify_intent
 from app.rate_limit import check_rate_limit
 from app.audit_log import add_usage_log, get_usage_logs, get_usage_stats
 from app.parser import extract_text, extract_pdf_page_images, SUPPORTED_EXTENSIONS
@@ -66,7 +66,7 @@ class LoginRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
     history: list[dict] = []
-    mode: str = "rag"  # "rag" | "hybrid" | "free" | "stepwise" | "multimodal" | "calculate" | "consistency"
+    mode: str = "auto"  # "auto" | "rag" | "hybrid" | "free" | "stepwise" | "multimodal" | "calculate" | "consistency"
     session_id: str = ""  # 空なら新規セッション
     model: str = ""  # 空ならデフォルトモデル
     doc_filter: list[str] = []  # 整合性チェック用: 対象ドキュメント名リスト
@@ -230,15 +230,18 @@ async def reset(_admin: dict = Depends(require_admin_user)):
 @app.post("/api/ask", response_model=AskResponse)
 async def ask_question(req: AskRequest):
     """質問に対して回答する（モード対応）"""
+    resolved_mode = req.mode
+    if req.mode == "auto":
+        resolved_mode = await classify_intent(req.question, req.model)
     hits = []
     context = None
-    if req.mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
+    if resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
-        if not hits and req.mode == "rag":
+        if not hits and resolved_mode == "rag":
             return AskResponse(answer="ドキュメントが登録されていません。先にファイルをアップロードしてください。", sources=[])
         if hits:
             context = "\n\n---\n\n".join(h["text"] for h in hits)
-    answer = await chat_completion(req.question, context, req.history, req.mode, req.model)
+    answer = await chat_completion(req.question, context, req.history, resolved_mode, req.model)
     return AskResponse(answer=answer, sources=hits)
 
 
@@ -250,26 +253,34 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
     if not check_rate_limit(user_id):
         raise HTTPException(status_code=429, detail="リクエスト回数の上限に達しました。しばらくお待ちください。")
 
+    # Auto モード: LLMで質問の意図を分類して適切なモードに振り分け
+    resolved_mode = req.mode
+    if req.mode == "auto":
+        resolved_mode = await classify_intent(req.question, req.model)
+
     # 利用ログ記録
     username = user["username"] if user else "anonymous"
-    add_usage_log(user_id, username, req.question, req.mode, req.model)
+    add_usage_log(user_id, username, req.question, resolved_mode, req.model)
 
     # セッション管理
-    session_id = req.session_id or create_session(req.question[:50], req.mode, user_id)
+    session_id = req.session_id or create_session(req.question[:50], resolved_mode, user_id)
     add_message(session_id, "user", req.question)
 
     hits = []
     context = None
     structured = None
     images_b64 = []
-    if req.mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
+    if resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
-        if not hits and req.mode == "rag":
+        if not hits and resolved_mode == "rag":
             no_doc_msg = "ドキュメントが登録されていません。先にファイルをアップロードしてください。"
             add_message(session_id, "assistant", no_doc_msg)
             async def no_docs():
                 data = json.dumps({"type": "session_id", "session_id": session_id}, ensure_ascii=False)
                 yield f"data: {data}\n\n"
+                if req.mode == "auto":
+                    data = json.dumps({"type": "resolved_mode", "mode": resolved_mode}, ensure_ascii=False)
+                    yield f"data: {data}\n\n"
                 data = json.dumps({"type": "sources", "sources": []}, ensure_ascii=False)
                 yield f"data: {data}\n\n"
                 data = json.dumps({"type": "token", "token": no_doc_msg}, ensure_ascii=False)
@@ -280,7 +291,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
             context = "\n\n---\n\n".join(h["text"] for h in hits)
 
         # マルチモーダルモード: 参照元のページ画像を取得
-        if req.mode == "multimodal" and hits:
+        if resolved_mode == "multimodal" and hits:
             source_pages: dict[str, list[int]] = {}
             for h in hits:
                 if h.get("page"):
@@ -293,7 +304,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
             images_b64 = images_b64[:4]
 
         # 計算モード: 表データを構造化形式で抽出
-        if req.mode == "calculate" and hits:
+        if resolved_mode == "calculate" and hits:
             from app.calc_engine import extract_tables_from_text, format_structured_tables
             tables = []
             for h in hits:
@@ -302,7 +313,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
                 structured = format_structured_tables(tables)
 
         # 整合性チェックモード: ルールベース検証結果をコンテキストに追加
-        if req.mode == "consistency" and hits:
+        if resolved_mode == "consistency" and hits:
             from app.consistency_checker import run_consistency_checks
             check_result = run_consistency_checks(hits)
             rule_context = check_result.to_context()
@@ -312,11 +323,15 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
         # セッションIDを送信
         data = json.dumps({"type": "session_id", "session_id": session_id}, ensure_ascii=False)
         yield f"data: {data}\n\n"
+        # Auto モードの場合は解決されたモードを通知
+        if req.mode == "auto":
+            data = json.dumps({"type": "resolved_mode", "mode": resolved_mode}, ensure_ascii=False)
+            yield f"data: {data}\n\n"
         data = json.dumps({"type": "sources", "sources": hits}, ensure_ascii=False)
         yield f"data: {data}\n\n"
         full_answer = ""
         # マルチモーダルモードで画像がある場合はVision対応ストリーミング
-        if req.mode == "multimodal" and images_b64:
+        if resolved_mode == "multimodal" and images_b64:
             async for token in chat_completion_vision_stream(
                 req.question, images_b64, context, req.history, req.model
             ):
@@ -325,7 +340,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
                 yield f"data: {data}\n\n"
         else:
             async for token in chat_completion_stream(
-                req.question, context, req.history, req.mode, req.model, structured
+                req.question, context, req.history, resolved_mode, req.model, structured
             ):
                 full_answer += token
                 data = json.dumps({"type": "token", "token": token}, ensure_ascii=False)

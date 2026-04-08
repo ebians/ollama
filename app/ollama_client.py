@@ -236,6 +236,46 @@ async def chat_completion_vision_stream(
                     break
 
 
+_CLASSIFY_SYSTEM = (
+    "あなたは質問の意図を分類するアシスタントです。\n"
+    "ユーザーの質問を読み、以下のモードの中から最も適切なものを1つだけ選んでください。\n\n"
+    "モード一覧:\n"
+    "- rag: 社内ドキュメントに関する一般的な質問（手順、規定、方針など）\n"
+    "- hybrid: ドキュメントに加えて一般知識も必要な質問\n"
+    "- stepwise: 複雑で多段階の分析・比較・考察が必要な質問\n"
+    "- calculate: 表の数値比較・差分・合計・平均など計算が必要な質問\n"
+    "- consistency: 複数文書間の矛盾・不一致の検出依頼\n"
+    "- free: 社内ドキュメントと無関係な一般的な質問・雑談\n\n"
+    "必ずモード名だけを1単語で出力してください。説明は不要です。"
+)
+
+_VALID_AUTO_MODES = {"rag", "hybrid", "stepwise", "calculate", "consistency", "free"}
+
+
+async def classify_intent(question: str, model: str = "") -> str:
+    """質問文からモードを自動分類する（軽量LLM呼び出し）。"""
+    use_model = model or CHAT_MODEL
+    messages = [
+        {"role": "system", "content": _CLASSIFY_SYSTEM},
+        {"role": "user", "content": question},
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={"model": use_model, "messages": messages, "stream": False},
+            )
+            resp.raise_for_status()
+            raw = resp.json()["message"]["content"].strip().lower()
+            # Extract mode name from response (handle extra text)
+            for mode in _VALID_AUTO_MODES:
+                if mode in raw:
+                    return mode
+            return "rag"  # fallback
+    except Exception:
+        return "rag"  # fallback on error
+
+
 _SUMMARIZE_SYSTEM = (
     "あなたはインタビュー記録を整理・要約する専門家です。\n"
     "以下のインタビュー記録（質問と回答のペア）を読み、次の2つを生成してください。\n\n"

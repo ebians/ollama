@@ -395,3 +395,35 @@ class TestConsistencyMode:
         data = r.json()
         assert "summary" in data
         assert "issues" in data
+
+
+class TestAutoMode:
+    @patch("app.main.classify_intent", new_callable=AsyncMock, return_value="free")
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="自動振り分けフリー回答")
+    async def test_auto_routes_to_free(self, mock_chat, mock_classify, client):
+        r = await client.post("/api/ask", json={"question": "今日は何曜日？", "mode": "auto"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["answer"] == "自動振り分けフリー回答"
+        assert data["sources"] == []
+        mock_classify.assert_called_once()
+
+    @patch("app.main.classify_intent", new_callable=AsyncMock, return_value="rag")
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="RAG回答です")
+    @patch("app.main.search", new_callable=AsyncMock, return_value=[
+        {"text": "有給休暇は年20日", "source": "rules.pdf", "distance": 0.1}
+    ])
+    async def test_auto_routes_to_rag(self, mock_search, mock_chat, mock_classify, client):
+        r = await client.post("/api/ask", json={"question": "有給休暇の日数は？", "mode": "auto"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["answer"] == "RAG回答です"
+        assert len(data["sources"]) == 1
+
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="明示モード回答")
+    async def test_explicit_mode_skips_classify(self, mock_chat, client):
+        """明示的にモード指定した場合はclassify_intentを呼ばない"""
+        with patch("app.main.classify_intent", new_callable=AsyncMock) as mock_classify:
+            r = await client.post("/api/ask", json={"question": "hello", "mode": "free"})
+            assert r.status_code == 200
+            mock_classify.assert_not_called()
