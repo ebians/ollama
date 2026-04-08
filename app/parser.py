@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 
@@ -92,6 +93,30 @@ def _ocr_page(page) -> str:
         return text.strip()
     except Exception:
         return ""
+
+
+def extract_pdf_page_images(data: bytes, dpi: int = 150) -> list[dict]:
+    """PDFの各ページをJPEG画像化し、Base64エンコードしたリストを返す。
+
+    Returns:
+        [{"page": 1, "image_b64": "...", "width": 800, "height": 1100}, ...]
+    """
+    doc = fitz.open(stream=data, filetype="pdf")
+    images: list[dict] = []
+    for page_num, page in enumerate(doc, 1):
+        pix = page.get_pixmap(dpi=dpi)
+        img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=80)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        images.append({
+            "page": page_num,
+            "image_b64": b64,
+            "width": pix.width,
+            "height": pix.height,
+        })
+    doc.close()
+    return images
 
 
 def _extract_docx(data: bytes) -> str:

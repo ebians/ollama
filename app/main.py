@@ -9,11 +9,12 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.config import ADMIN_PASSWORD
-from app.ollama_client import chat_completion, chat_completion_stream, list_models
+from app.ollama_client import chat_completion, chat_completion_stream, chat_completion_vision_stream, list_models
 from app.rate_limit import check_rate_limit
 from app.audit_log import add_usage_log, get_usage_logs, get_usage_stats
-from app.parser import extract_text, SUPPORTED_EXTENSIONS
+from app.parser import extract_text, extract_pdf_page_images, SUPPORTED_EXTENSIONS
 from app.vectorstore import add_document, search, get_stats, reset_db, list_documents, delete_document, get_document_chunks
+from app.page_image_store import save_page_image, get_page_images, delete_page_images
 from app.chat_store import (
     create_session, add_message, get_sessions, get_messages, delete_session,
 )
@@ -65,9 +66,10 @@ class LoginRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
     history: list[dict] = []
-    mode: str = "rag"  # "rag" | "hybrid" | "free" | "stepwise"
+    mode: str = "rag"  # "rag" | "hybrid" | "free" | "stepwise" | "multimodal" | "calculate" | "consistency"
     session_id: str = ""  # 空なら新規セッション
     model: str = ""  # 空ならデフォルトモデル
+    doc_filter: list[str] = []  # 整合性チェック用: 対象ドキュメント名リスト
 
 
 class AskResponse(BaseModel):
@@ -180,7 +182,17 @@ async def upload_document(file: UploadFile = File(...), _admin: dict = Depends(r
     text = extract_text(filename, content)
     doc_id = uuid.uuid4().hex[:12]
     num_chunks = await add_document(doc_id, filename, text)
-    return {"doc_id": doc_id, "filename": filename, "chunks": num_chunks}
+    # PDFの場合はページ画像も保存（マルチモーダルRAG用）
+    page_images_count = 0
+    if ext == ".pdf":
+        try:
+            page_imgs = extract_pdf_page_images(content)
+            for img in page_imgs:
+                save_page_image(filename, img["page"], img["image_b64"], img["width"], img["height"])
+            page_images_count = len(page_imgs)
+        except Exception:
+            pass  # 画像抽出失敗時はテキストRAGのみで動作
+    return {"doc_id": doc_id, "filename": filename, "chunks": num_chunks, "page_images": page_images_count}
 
 
 @app.get("/api/documents")
@@ -195,6 +207,7 @@ async def remove_document(source: str, _admin: dict = Depends(require_admin_user
     deleted = delete_document(source)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="ドキュメントが見つかりません")
+    delete_page_images(source)
     return {"source": source, "deleted_chunks": deleted}
 
 
@@ -219,7 +232,7 @@ async def ask_question(req: AskRequest):
     """質問に対して回答する（モード対応）"""
     hits = []
     context = None
-    if req.mode in ("rag", "hybrid", "stepwise"):
+    if req.mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
         if not hits and req.mode == "rag":
             return AskResponse(answer="ドキュメントが登録されていません。先にファイルをアップロードしてください。", sources=[])
@@ -247,7 +260,9 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
 
     hits = []
     context = None
-    if req.mode in ("rag", "hybrid", "stepwise"):
+    structured = None
+    images_b64 = []
+    if req.mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
         if not hits and req.mode == "rag":
             no_doc_msg = "ドキュメントが登録されていません。先にファイルをアップロードしてください。"
@@ -264,6 +279,35 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
         if hits:
             context = "\n\n---\n\n".join(h["text"] for h in hits)
 
+        # マルチモーダルモード: 参照元のページ画像を取得
+        if req.mode == "multimodal" and hits:
+            source_pages: dict[str, list[int]] = {}
+            for h in hits:
+                if h.get("page"):
+                    source_pages.setdefault(h["source"], []).append(h["page"])
+            for source, pages in source_pages.items():
+                page_imgs = get_page_images(source, pages)
+                for img in page_imgs:
+                    images_b64.append(img["image_b64"])
+            # 画像は最大4ページに制限（VRAM節約）
+            images_b64 = images_b64[:4]
+
+        # 計算モード: 表データを構造化形式で抽出
+        if req.mode == "calculate" and hits:
+            from app.calc_engine import extract_tables_from_text, format_structured_tables
+            tables = []
+            for h in hits:
+                tables.extend(extract_tables_from_text(h["text"]))
+            if tables:
+                structured = format_structured_tables(tables)
+
+        # 整合性チェックモード: ルールベース検証結果をコンテキストに追加
+        if req.mode == "consistency" and hits:
+            from app.consistency_checker import run_consistency_checks
+            check_result = run_consistency_checks(hits)
+            rule_context = check_result.to_context()
+            context = f"{rule_context}\n\n---\n\n## 文書テキスト\n{context}"
+
     async def generate():
         # セッションIDを送信
         data = json.dumps({"type": "session_id", "session_id": session_id}, ensure_ascii=False)
@@ -271,10 +315,21 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
         data = json.dumps({"type": "sources", "sources": hits}, ensure_ascii=False)
         yield f"data: {data}\n\n"
         full_answer = ""
-        async for token in chat_completion_stream(req.question, context, req.history, req.mode, req.model):
-            full_answer += token
-            data = json.dumps({"type": "token", "token": token}, ensure_ascii=False)
-            yield f"data: {data}\n\n"
+        # マルチモーダルモードで画像がある場合はVision対応ストリーミング
+        if req.mode == "multimodal" and images_b64:
+            async for token in chat_completion_vision_stream(
+                req.question, images_b64, context, req.history, req.model
+            ):
+                full_answer += token
+                data = json.dumps({"type": "token", "token": token}, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+        else:
+            async for token in chat_completion_stream(
+                req.question, context, req.history, req.mode, req.model, structured
+            ):
+                full_answer += token
+                data = json.dumps({"type": "token", "token": token}, ensure_ascii=False)
+                yield f"data: {data}\n\n"
         # 回答をDBに保存
         add_message(session_id, "assistant", full_answer, hits if hits else None)
         yield "data: [DONE]\n\n"
@@ -351,6 +406,43 @@ async def export_session(session_id: str, user: dict | None = Depends(get_curren
 async def api_usage_logs(limit: int = 100, offset: int = 0, _admin: dict = Depends(require_admin_user)):
     """利用ログを返す（管理者のみ）"""
     return {"logs": get_usage_logs(limit, offset), "stats": get_usage_stats()}
+
+
+# ---------- 整合性チェック API（管理者のみ）----------
+
+class ConsistencyCheckRequest(BaseModel):
+    sources: list[str] = []  # 空なら全ドキュメント
+
+@app.post("/api/consistency-check")
+async def api_consistency_check(req: ConsistencyCheckRequest, _admin: dict = Depends(require_admin_user)):
+    """ドキュメント間のルールベース整合性チェックを実行する（管理者専用）"""
+    from app.consistency_checker import run_consistency_checks
+    from app.vectorstore import _collection
+
+    if _collection.count() == 0:
+        return {"summary": "ドキュメントが登録されていません", "issues": []}
+
+    all_data = _collection.get(include=["metadatas", "documents"])
+    chunks = []
+    for meta, doc in zip(all_data["metadatas"], all_data["documents"]):
+        if req.sources and meta.get("source") not in req.sources:
+            continue
+        chunks.append({"text": doc, "source": meta.get("source", "unknown")})
+
+    result = run_consistency_checks(chunks)
+    issues = [
+        {
+            "category": i.category,
+            "severity": i.severity,
+            "description": i.description,
+            "source_a": i.source_a,
+            "source_b": i.source_b,
+            "text_a": i.text_a,
+            "text_b": i.text_b,
+        }
+        for i in result.inconsistencies
+    ]
+    return {"summary": result.summary, "issues": issues}
 
 
 # ---------- Static / Frontend ----------

@@ -347,3 +347,51 @@ class TestChatExport:
     async def test_export_nonexistent(self, client, as_user):
         r = await client.get("/api/sessions/nonexistent123/export")
         assert r.status_code == 404
+
+
+class TestMultimodalMode:
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="図表から読み取りました")
+    @patch("app.main.search", new_callable=AsyncMock, return_value=[
+        {"text": "表データ", "source": "report.pdf", "distance": 0.1, "page": 1}
+    ])
+    async def test_ask_multimodal(self, mock_search, mock_chat, client):
+        r = await client.post("/api/ask", json={"question": "図表の内容は？", "mode": "multimodal"})
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["sources"]) == 1
+
+
+class TestCalculateMode:
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="差額は200万円です")
+    @patch("app.main.search", new_callable=AsyncMock, return_value=[
+        {"text": "| 部門 | 売上 |\n| --- | --- |\n| A | 1000万 |\n| B | 800万 |", "source": "report.pdf", "distance": 0.1}
+    ])
+    async def test_ask_calculate(self, mock_search, mock_chat, client):
+        r = await client.post("/api/ask", json={"question": "A部門とB部門の売上差は？", "mode": "calculate"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "sources" in data
+
+
+class TestConsistencyMode:
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="不一致があります")
+    @patch("app.main.search", new_callable=AsyncMock, return_value=[
+        {"text": "納期は30日", "source": "a.pdf", "distance": 0.1},
+        {"text": "納期は45日", "source": "b.pdf", "distance": 0.2},
+    ])
+    async def test_ask_consistency(self, mock_search, mock_chat, client):
+        r = await client.post("/api/ask", json={"question": "文書間の整合性をチェック", "mode": "consistency"})
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["sources"]) == 2
+
+    async def test_consistency_check_api_no_auth(self, client):
+        r = await client.post("/api/consistency-check", json={"sources": []})
+        assert r.status_code == 401
+
+    async def test_consistency_check_api_as_admin(self, client, as_admin):
+        r = await client.post("/api/consistency-check", json={"sources": []})
+        assert r.status_code == 200
+        data = r.json()
+        assert "summary" in data
+        assert "issues" in data

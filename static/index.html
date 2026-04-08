@@ -284,6 +284,9 @@
             <button class="mode-btn active" data-mode="rag" onclick="setMode('rag', this)">📄 RAGモード</button>
             <button class="mode-btn" data-mode="hybrid" onclick="setMode('hybrid', this)">🔀 ハイブリッド</button>
             <button class="mode-btn" data-mode="stepwise" onclick="setMode('stepwise', this)">🧠 段階的推論</button>
+            <button class="mode-btn" data-mode="multimodal" onclick="setMode('multimodal', this)">🖼️ 図表読取</button>
+            <button class="mode-btn" data-mode="calculate" onclick="setMode('calculate', this)">🔢 数値計算</button>
+            <button class="mode-btn" data-mode="consistency" onclick="setMode('consistency', this)">⚖️ 整合性</button>
             <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリーチャット</button>
         </div>
         <div class="model-row">
@@ -465,6 +468,9 @@ function setMode(mode, btn) {
         rag: '社内ドキュメントについて質問...',
         hybrid: '社内文書 + 一般知識で回答...',
         stepwise: '複雑文書を段階的に分析して回答...',
+        multimodal: 'PDF図表・画像を読み取って回答... (Vision対応モデル必要)',
+        calculate: '表の数値比較・差分・集計を計算...',
+        consistency: '文書間の矛盾・不一致を検出...',
         free: '何でも質問してください...'
     };
     questionInput.placeholder = placeholders[mode] || placeholders.rag;
