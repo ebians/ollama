@@ -9,7 +9,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.config import ADMIN_PASSWORD
-from app.ollama_client import chat_completion, chat_completion_stream, chat_completion_vision_stream, list_models
+from app.ollama_client import chat_completion, chat_completion_stream, chat_completion_vision_stream, list_models, generate_summary_and_faq
 from app.rate_limit import check_rate_limit
 from app.audit_log import add_usage_log, get_usage_logs, get_usage_stats
 from app.parser import extract_text, extract_pdf_page_images, SUPPORTED_EXTENSIONS
@@ -443,6 +443,146 @@ async def api_consistency_check(req: ConsistencyCheckRequest, _admin: dict = Dep
         for i in result.inconsistencies
     ]
     return {"summary": result.summary, "issues": issues}
+
+
+# ---------- 暗黙知ワークフロー API（管理者のみ）----------
+
+from app.knowledge_store import (
+    create_workflow, get_workflow, list_workflows, update_interview_data,
+    save_summary, submit_for_review, approve_workflow, reject_workflow,
+    set_doc_id, delete_workflow, get_workflow_stats,
+)
+
+
+class CreateWorkflowRequest(BaseModel):
+    title: str
+    category: str = ""
+    interviewee: str = ""
+
+class InterviewDataRequest(BaseModel):
+    interview_data: list[dict]  # [{"q": "質問", "a": "回答"}, ...]
+
+class GenerateSummaryRequest(BaseModel):
+    model: str = ""
+
+class ReviewRequest(BaseModel):
+    action: str  # "approve" | "reject"
+    review_notes: str = ""
+
+
+@app.get("/api/knowledge/stats")
+async def api_knowledge_stats(_admin: dict = Depends(require_admin_user)):
+    """ワークフロー統計"""
+    return get_workflow_stats()
+
+
+@app.get("/api/knowledge")
+async def api_list_workflows(stage: str = "", _admin: dict = Depends(require_admin_user)):
+    """ワークフロー一覧"""
+    return list_workflows(stage)
+
+
+@app.post("/api/knowledge")
+async def api_create_workflow(req: CreateWorkflowRequest, admin: dict = Depends(require_admin_user)):
+    """新規ワークフロー作成"""
+    wf_id = create_workflow(req.title, req.category, req.interviewee, admin["id"])
+    return {"id": wf_id}
+
+
+@app.get("/api/knowledge/{wf_id}")
+async def api_get_workflow(wf_id: str, _admin: dict = Depends(require_admin_user)):
+    """ワークフロー詳細"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    return wf
+
+
+@app.put("/api/knowledge/{wf_id}/interview")
+async def api_update_interview(wf_id: str, req: InterviewDataRequest, _admin: dict = Depends(require_admin_user)):
+    """インタビューデータ保存"""
+    ok = update_interview_data(wf_id, req.interview_data)
+    if not ok:
+        raise HTTPException(status_code=400, detail="draftステージのワークフローのみ編集できます")
+    return {"status": "ok"}
+
+
+@app.post("/api/knowledge/{wf_id}/summarize")
+async def api_generate_summary(wf_id: str, req: GenerateSummaryRequest, _admin: dict = Depends(require_admin_user)):
+    """LLMで要約・FAQ生成"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not wf["interview_data"]:
+        raise HTTPException(status_code=400, detail="インタビューデータが空です")
+    result = await generate_summary_and_faq(wf["interview_data"], wf["title"], req.model)
+    save_summary(wf_id, result["summary"], result["faq"])
+    return result
+
+
+@app.post("/api/knowledge/{wf_id}/submit-review")
+async def api_submit_review(wf_id: str, _admin: dict = Depends(require_admin_user)):
+    """レビュー依頼"""
+    ok = submit_for_review(wf_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail="summaryステージのワークフローのみレビュー依頼できます")
+    return {"status": "ok"}
+
+
+@app.post("/api/knowledge/{wf_id}/review")
+async def api_review_workflow(wf_id: str, req: ReviewRequest, admin: dict = Depends(require_admin_user)):
+    """レビュー承認/差し戻し"""
+    if req.action == "approve":
+        ok = approve_workflow(wf_id, admin["id"], req.review_notes)
+    elif req.action == "reject":
+        ok = reject_workflow(wf_id, admin["id"], req.review_notes)
+    else:
+        raise HTTPException(status_code=400, detail="actionは 'approve' または 'reject' です")
+    if not ok:
+        raise HTTPException(status_code=400, detail="reviewステージのワークフローのみ操作できます")
+    return {"status": "ok"}
+
+
+@app.post("/api/knowledge/{wf_id}/publish")
+async def api_publish_workflow(wf_id: str, _admin: dict = Depends(require_admin_user)):
+    """承認済みワークフローをRAGに公開（FAQをベクトルDBに登録）"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if wf["stage"] != "published":
+        raise HTTPException(status_code=400, detail="承認済み(published)のワークフローのみ公開できます")
+    if wf["doc_id"]:
+        raise HTTPException(status_code=400, detail="既にRAGに公開済みです")
+
+    # FAQ + 要約をテキスト化してベクトルDBに登録
+    parts = [f"# {wf['title']}"]
+    if wf["summary"]:
+        parts.append(f"\n## 概要\n{wf['summary']}")
+    if wf.get("category"):
+        parts.append(f"カテゴリ: {wf['category']}")
+    if wf.get("interviewee"):
+        parts.append(f"ナレッジ提供者: {wf['interviewee']}")
+    parts.append("\n## FAQ")
+    for i, faq_item in enumerate(wf["faq"], 1):
+        q = faq_item.get("q", "")
+        a = faq_item.get("a", "")
+        parts.append(f"\n### Q{i}. {q}\n{a}")
+
+    text = "\n".join(parts)
+    doc_name = f"knowledge_{wf['id']}_{wf['title'][:20]}.txt"
+    doc_id = uuid.uuid4().hex[:12]
+    num_chunks = await add_document(doc_id, doc_name, text)
+    set_doc_id(wf_id, doc_id)
+    return {"doc_id": doc_id, "doc_name": doc_name, "chunks": num_chunks}
+
+
+@app.delete("/api/knowledge/{wf_id}")
+async def api_delete_workflow(wf_id: str, _admin: dict = Depends(require_admin_user)):
+    """ワークフロー削除"""
+    ok = delete_workflow(wf_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    return {"status": "ok"}
 
 
 # ---------- Static / Frontend ----------

@@ -219,6 +219,65 @@
         [data-theme="dark"] .log-stats { color: #94a3b8; }
         [data-theme="dark"] .log-stats strong { color: #e2e8f0; }
         [data-theme="dark"] footer { color: #475569; }
+
+        /* ---------- Knowledge Workflow ---------- */
+        .kw-stage-filter { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .kw-stage-filter button { padding: 4px 12px; border: 1px solid #cbd5e1; border-radius: 16px; background: #fff; cursor: pointer; font-size: 0.8rem; }
+        .kw-stage-filter button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .kw-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .kw-badge-draft { background: #e2e8f0; color: #475569; }
+        .kw-badge-summary { background: #dbeafe; color: #1d4ed8; }
+        .kw-badge-review { background: #fef3c7; color: #92400e; }
+        .kw-badge-published { background: #d1fae5; color: #065f46; }
+        .kw-create-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .kw-create-form input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }
+        .kw-create-form input:first-child { flex: 2; min-width: 150px; }
+        .kw-create-form input:nth-child(2), .kw-create-form input:nth-child(3) { flex: 1; min-width: 100px; }
+        .kw-msg { font-size: 0.85rem; margin: 6px 0; }
+        .kw-msg.ok { color: #16a34a; }
+        .kw-msg.err { color: #dc2626; }
+        .kw-detail-section { margin-bottom: 16px; }
+        .kw-detail-section h4 { font-size: 0.9rem; color: #475569; margin-bottom: 6px; }
+        .kw-qa-pair { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+        .kw-qa-pair label { font-size: 0.75rem; color: #64748b; display: block; margin-bottom: 2px; }
+        .kw-qa-pair textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px; font-size: 0.85rem; resize: vertical; min-height: 48px; font-family: inherit; }
+        .kw-qa-pair .kw-remove-qa { float: right; background: none; border: none; color: #dc2626; cursor: pointer; font-size: 0.8rem; }
+        .kw-faq-card { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+        .kw-faq-card strong { font-size: 0.85rem; color: #0369a1; }
+        .kw-faq-card p { font-size: 0.85rem; color: #334155; margin-top: 4px; }
+        .kw-summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 0.85rem; line-height: 1.6; }
+        .kw-review-area textarea { width: 100%; min-height: 60px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; font-size: 0.85rem; font-family: inherit; }
+        .kw-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .kw-actions button { padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+        .kw-btn-primary { background: #2563eb; color: #fff; }
+        .kw-btn-primary:hover { background: #1d4ed8; }
+        .kw-btn-success { background: #16a34a; color: #fff; }
+        .kw-btn-success:hover { background: #15803d; }
+        .kw-btn-warn { background: #f59e0b; color: #fff; }
+        .kw-btn-warn:hover { background: #d97706; }
+        .kw-btn-danger { background: #dc2626; color: #fff; }
+        .kw-btn-danger:hover { background: #b91c1c; }
+        .kw-btn-outline { background: #fff; border: 1px solid #cbd5e1; color: #475569; }
+        .kw-btn-outline:hover { background: #f1f5f9; }
+        .kw-progress { display: flex; gap: 0; margin-bottom: 16px; }
+        .kw-progress-step { flex: 1; text-align: center; padding: 6px 4px; font-size: 0.75rem; color: #94a3b8; background: #f1f5f9; border-right: 2px solid #fff; }
+        .kw-progress-step:first-child { border-radius: 6px 0 0 6px; }
+        .kw-progress-step:last-child { border-radius: 0 6px 6px 0; border-right: none; }
+        .kw-progress-step.done { background: #d1fae5; color: #065f46; }
+        .kw-progress-step.current { background: #2563eb; color: #fff; font-weight: 600; }
+        [data-theme="dark"] .kw-stage-filter button { background: #1e293b; border-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .kw-stage-filter button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        [data-theme="dark"] .kw-create-form input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .kw-qa-pair { background: #0f172a; border-color: #334155; }
+        [data-theme="dark"] .kw-qa-pair textarea { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .kw-faq-card { background: #0c1526; border-color: #1e3a5f; }
+        [data-theme="dark"] .kw-faq-card strong { color: #38bdf8; }
+        [data-theme="dark"] .kw-faq-card p { color: #cbd5e1; }
+        [data-theme="dark"] .kw-summary-box { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+        [data-theme="dark"] .kw-review-area textarea { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .kw-btn-outline { background: #1e293b; border-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .kw-progress-step { background: #1e293b; color: #64748b; }
+        [data-theme="dark"] .kw-progress-step.done { background: #064e3b; color: #6ee7b7; }
     </style>
 </head>
 <body>
@@ -335,6 +394,30 @@
         <div id="log-list"></div>
     </div>
 
+    <!-- Knowledge Workflow Card -->
+    <div class="card">
+        <h2>🧠 暗黙知の形式知化</h2>
+        <p style="font-size:0.85rem;color:#64748b;margin-bottom:12px">ベテラン社員のノウハウをインタビュー形式で記録し、FAQ化してRAGに公開するワークフロー</p>
+
+        <div class="kw-create-form">
+            <input type="text" id="kw-title" placeholder="タイトル（例: ○○工程の品質ノウハウ）">
+            <input type="text" id="kw-category" placeholder="カテゴリ">
+            <input type="text" id="kw-interviewee" placeholder="ナレッジ提供者">
+            <button class="btn-primary" onclick="kwCreate()">＋ 新規作成</button>
+        </div>
+        <div class="kw-msg" id="kw-msg"></div>
+
+        <div class="kw-stage-filter" id="kw-stage-filter">
+            <button class="active" onclick="kwFilter('')">全て</button>
+            <button onclick="kwFilter('draft')">📝 下書き</button>
+            <button onclick="kwFilter('summary')">📋 要約済み</button>
+            <button onclick="kwFilter('review')">👀 レビュー中</button>
+            <button onclick="kwFilter('published')">✅ 公開済み</button>
+        </div>
+
+        <div id="kw-list"></div>
+    </div>
+
     <footer>管理者専用画面 — 認証が必要です</footer>
 </div>
 
@@ -346,6 +429,19 @@
             <button class="modal-close" onclick="closeChunkModal()">✕</button>
         </div>
         <div class="modal-body" id="chunk-modal-body">
+            <p>読み込み中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Knowledge Workflow Detail Modal -->
+<div class="modal-overlay hidden" id="kw-modal">
+    <div class="modal" style="max-width:720px">
+        <div class="modal-header">
+            <h3 id="kw-modal-title">ワークフロー詳細</h3>
+            <button class="modal-close" onclick="kwCloseModal()">✕</button>
+        </div>
+        <div class="modal-body" id="kw-modal-body">
             <p>読み込み中...</p>
         </div>
     </div>
@@ -457,6 +553,7 @@ async function loadData() {
     // Load users and logs
     loadUsers();
     loadLogs();
+    kwLoadList();
 }
 
 function renderDocs(docs) {
@@ -732,6 +829,352 @@ async function loadLogs(offset = 0) {
     html += '</tbody></table>';
     listEl.innerHTML = html;
 }
+
+// ---------- Knowledge Workflow ----------
+let kwCurrentStage = '';
+let kwCurrentWf = null;
+
+function kwShowMsg(text, isError) {
+    const el = document.getElementById('kw-msg');
+    el.textContent = text;
+    el.className = 'kw-msg ' + (isError ? 'err' : 'ok');
+    setTimeout(() => { el.textContent = ''; el.className = 'kw-msg'; }, 5000);
+}
+
+function kwStageBadge(stage) {
+    const labels = { draft: '📝 下書き', summary: '📋 要約済み', review: '👀 レビュー中', published: '✅ 公開済み' };
+    return `<span class="kw-badge kw-badge-${stage}">${labels[stage] || stage}</span>`;
+}
+
+function kwProgressBar(stage) {
+    const stages = ['draft', 'summary', 'review', 'published'];
+    const idx = stages.indexOf(stage);
+    return '<div class="kw-progress">' + stages.map((s, i) => {
+        const cls = i < idx ? 'done' : i === idx ? 'current' : '';
+        const labels = { draft: '下書き', summary: '要約', review: 'レビュー', published: '公開' };
+        return `<div class="kw-progress-step ${cls}">${labels[s]}</div>`;
+    }).join('') + '</div>';
+}
+
+async function kwCreate() {
+    const title = document.getElementById('kw-title').value.trim();
+    const category = document.getElementById('kw-category').value.trim();
+    const interviewee = document.getElementById('kw-interviewee').value.trim();
+    if (!title) { kwShowMsg('タイトルは必須です', true); return; }
+    const r = await authFetch('/api/knowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, category, interviewee }),
+    });
+    if (!r) return;
+    if (r.ok) {
+        const data = await r.json();
+        kwShowMsg(`✅ 作成しました (ID: ${data.id})`, false);
+        document.getElementById('kw-title').value = '';
+        document.getElementById('kw-category').value = '';
+        document.getElementById('kw-interviewee').value = '';
+        kwLoadList();
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || '作成に失敗しました', true);
+    }
+}
+
+function kwFilter(stage) {
+    kwCurrentStage = stage;
+    document.querySelectorAll('#kw-stage-filter button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    kwLoadList();
+}
+
+async function kwLoadList() {
+    const url = kwCurrentStage ? `/api/knowledge?stage=${kwCurrentStage}` : '/api/knowledge';
+    const r = await authFetch(url);
+    if (!r) return;
+    const wfs = await r.json();
+    const el = document.getElementById('kw-list');
+    if (wfs.length === 0) {
+        el.innerHTML = '<div class="doc-empty">ワークフローがありません</div>';
+        return;
+    }
+    let html = '<table class="doc-table"><thead><tr><th>タイトル</th><th>カテゴリ</th><th>提供者</th><th>ステージ</th><th>更新日</th><th></th></tr></thead><tbody>';
+    for (const wf of wfs) {
+        const updated = wf.updated_at ? wf.updated_at.slice(0, 10) : '';
+        html += `<tr>
+            <td style="cursor:pointer;color:#2563eb;font-weight:500" onclick="kwOpenDetail('${wf.id}')">${escapeHtml(wf.title)}</td>
+            <td style="font-size:0.8rem">${escapeHtml(wf.category)}</td>
+            <td style="font-size:0.8rem">${escapeHtml(wf.interviewee)}</td>
+            <td>${kwStageBadge(wf.stage)}</td>
+            <td style="font-size:0.8rem;color:#64748b">${updated}</td>
+            <td>
+                <button class="btn-preview" onclick="kwOpenDetail('${wf.id}')">詳細</button>
+                <button class="btn-danger-outline btn-sm" onclick="kwDelete('${wf.id}', '${escapeAttr(wf.title)}')">削除</button>
+            </td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+async function kwDelete(id, title) {
+    if (!confirm(`「${title}」を削除しますか？`)) return;
+    const r = await authFetch(`/api/knowledge/${id}`, { method: 'DELETE' });
+    if (r && r.ok) {
+        kwShowMsg(`${title} を削除しました`, false);
+        kwLoadList();
+    }
+}
+
+async function kwOpenDetail(id) {
+    const modal = document.getElementById('kw-modal');
+    const body = document.getElementById('kw-modal-body');
+    const title = document.getElementById('kw-modal-title');
+    body.innerHTML = '<p style="color:#64748b">読み込み中...</p>';
+    modal.classList.remove('hidden');
+
+    const r = await authFetch(`/api/knowledge/${id}`);
+    if (!r) { modal.classList.add('hidden'); return; }
+    kwCurrentWf = await r.json();
+    title.textContent = `🧠 ${kwCurrentWf.title}`;
+    kwRenderDetail();
+}
+
+function kwRenderDetail() {
+    const wf = kwCurrentWf;
+    if (!wf) return;
+    const body = document.getElementById('kw-modal-body');
+    let html = kwProgressBar(wf.stage);
+
+    html += `<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:12px">
+        ID: ${wf.id} ｜ カテゴリ: ${escapeHtml(wf.category || '—')} ｜ 提供者: ${escapeHtml(wf.interviewee || '—')}
+    </div>`;
+
+    // Interview Section
+    html += '<div class="kw-detail-section"><h4>📝 インタビュー記録</h4>';
+    if (wf.stage === 'draft') {
+        const qaData = wf.interview_data || [];
+        html += '<div id="kw-qa-container">';
+        if (qaData.length === 0) {
+            html += kwQaPairHtml(0, '', '');
+        } else {
+            qaData.forEach((item, i) => {
+                html += kwQaPairHtml(i, item.q || '', item.a || '');
+            });
+        }
+        html += '</div>';
+        html += `<div class="kw-actions">
+            <button class="kw-btn-outline" onclick="kwAddQaPair()">＋ Q&A追加</button>
+            <button class="kw-btn-primary" onclick="kwSaveInterview()">💾 保存</button>
+            <button class="kw-btn-success" onclick="kwGenerateSummary()">🤖 AI要約・FAQ生成</button>
+        </div>`;
+    } else {
+        const qaData = wf.interview_data || [];
+        if (qaData.length === 0) {
+            html += '<p style="color:#94a3b8;font-size:0.85rem">データなし</p>';
+        } else {
+            qaData.forEach((item, i) => {
+                html += `<div class="kw-qa-pair">
+                    <label>Q${i+1}</label><p style="font-size:0.85rem;margin-bottom:4px">${escapeHtml(item.q || '')}</p>
+                    <label>A${i+1}</label><p style="font-size:0.85rem">${escapeHtml(item.a || '')}</p>
+                </div>`;
+            });
+        }
+    }
+    html += '</div>';
+
+    // Summary & FAQ Section
+    if (wf.summary || wf.faq.length > 0) {
+        html += '<div class="kw-detail-section"><h4>📋 AI生成 要約・FAQ</h4>';
+        if (wf.summary) {
+            html += `<div class="kw-summary-box">${escapeHtml(wf.summary)}</div>`;
+        }
+        if (wf.faq.length > 0) {
+            wf.faq.forEach((item, i) => {
+                html += `<div class="kw-faq-card">
+                    <strong>Q${i+1}. ${escapeHtml(item.q || '')}</strong>
+                    <p>${escapeHtml(item.a || '')}</p>
+                </div>`;
+            });
+        }
+
+        if (wf.stage === 'summary') {
+            html += `<div class="kw-actions">
+                <button class="kw-btn-success" onclick="kwGenerateSummary()">🔄 再生成</button>
+                <button class="kw-btn-primary" onclick="kwSubmitReview()">📤 レビュー依頼</button>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    // Review Section
+    if (wf.stage === 'review') {
+        html += '<div class="kw-detail-section"><h4>👀 レビュー</h4>';
+        html += '<div class="kw-review-area"><textarea id="kw-review-notes" placeholder="レビューコメント（任意）"></textarea></div>';
+        html += `<div class="kw-actions">
+            <button class="kw-btn-success" onclick="kwReview('approve')">✅ 承認</button>
+            <button class="kw-btn-warn" onclick="kwReview('reject')">↩️ 差し戻し</button>
+        </div></div>`;
+    }
+
+    // Published Section
+    if (wf.stage === 'published') {
+        html += '<div class="kw-detail-section"><h4>✅ 公開状況</h4>';
+        if (wf.doc_id) {
+            html += `<p style="font-size:0.85rem;color:#16a34a">RAGに公開済み（doc_id: ${escapeHtml(wf.doc_id)}）</p>`;
+        } else {
+            html += `<div class="kw-actions">
+                <button class="kw-btn-success" onclick="kwPublish()">🚀 RAGに公開</button>
+            </div>`;
+        }
+        if (wf.review_notes) {
+            html += `<p style="font-size:0.85rem;color:#64748b;margin-top:8px">レビューメモ: ${escapeHtml(wf.review_notes)}</p>`;
+        }
+        html += '</div>';
+    }
+
+    body.innerHTML = html;
+}
+
+function kwQaPairHtml(index, q, a) {
+    return `<div class="kw-qa-pair" data-qa-index="${index}">
+        <button class="kw-remove-qa" onclick="this.parentElement.remove()">✕ 削除</button>
+        <label>質問 ${index + 1}</label>
+        <textarea class="kw-q" rows="2" placeholder="質問を入力...">${escapeHtml(q)}</textarea>
+        <label>回答 ${index + 1}</label>
+        <textarea class="kw-a" rows="3" placeholder="回答を入力...">${escapeHtml(a)}</textarea>
+    </div>`;
+}
+
+function kwAddQaPair() {
+    const container = document.getElementById('kw-qa-container');
+    const count = container.querySelectorAll('.kw-qa-pair').length;
+    container.insertAdjacentHTML('beforeend', kwQaPairHtml(count, '', ''));
+}
+
+function kwCollectQaPairs() {
+    const pairs = [];
+    document.querySelectorAll('#kw-qa-container .kw-qa-pair').forEach(el => {
+        const q = el.querySelector('.kw-q').value.trim();
+        const a = el.querySelector('.kw-a').value.trim();
+        if (q || a) pairs.push({ q, a });
+    });
+    return pairs;
+}
+
+async function kwSaveInterview() {
+    const data = kwCollectQaPairs();
+    if (data.length === 0) { kwShowMsg('Q&Aを1つ以上入力してください', true); return; }
+    const r = await authFetch(`/api/knowledge/${kwCurrentWf.id}/interview`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview_data: data }),
+    });
+    if (!r) return;
+    if (r.ok) {
+        kwCurrentWf.interview_data = data;
+        kwShowMsg('✅ インタビューデータを保存しました', false);
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || '保存に失敗しました', true);
+    }
+}
+
+async function kwGenerateSummary() {
+    if (kwCurrentWf.stage === 'draft') {
+        const data = kwCollectQaPairs();
+        if (data.length === 0) { kwShowMsg('Q&Aを1つ以上入力してください', true); return; }
+        // Save first
+        const sr = await authFetch(`/api/knowledge/${kwCurrentWf.id}/interview`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interview_data: data }),
+        });
+        if (!sr || !sr.ok) { kwShowMsg('インタビューデータの保存に失敗しました', true); return; }
+        kwCurrentWf.interview_data = data;
+    }
+    const body = document.getElementById('kw-modal-body');
+    body.innerHTML = '<p style="text-align:center;padding:40px;color:#64748b">🤖 AI が要約・FAQ を生成中...<br><small>モデルの応答を待っています（数十秒かかる場合があります）</small></p>';
+    const r = await authFetch(`/api/knowledge/${kwCurrentWf.id}/summarize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: '' }),
+    });
+    if (!r) { kwRenderDetail(); return; }
+    if (r.ok) {
+        const result = await r.json();
+        kwCurrentWf.summary = result.summary;
+        kwCurrentWf.faq = result.faq;
+        kwCurrentWf.stage = 'summary';
+        kwShowMsg('✅ 要約・FAQを生成しました', false);
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || '生成に失敗しました', true);
+    }
+    // Reload detail
+    const r2 = await authFetch(`/api/knowledge/${kwCurrentWf.id}`);
+    if (r2 && r2.ok) kwCurrentWf = await r2.json();
+    kwRenderDetail();
+}
+
+async function kwSubmitReview() {
+    const r = await authFetch(`/api/knowledge/${kwCurrentWf.id}/submit-review`, { method: 'POST' });
+    if (!r) return;
+    if (r.ok) {
+        kwCurrentWf.stage = 'review';
+        kwShowMsg('✅ レビュー依頼しました', false);
+        kwRenderDetail();
+        kwLoadList();
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || 'レビュー依頼に失敗しました', true);
+    }
+}
+
+async function kwReview(action) {
+    const notes = document.getElementById('kw-review-notes')?.value || '';
+    const r = await authFetch(`/api/knowledge/${kwCurrentWf.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, review_notes: notes }),
+    });
+    if (!r) return;
+    if (r.ok) {
+        kwShowMsg(action === 'approve' ? '✅ 承認しました' : '↩️ 差し戻しました', false);
+        const r2 = await authFetch(`/api/knowledge/${kwCurrentWf.id}`);
+        if (r2 && r2.ok) kwCurrentWf = await r2.json();
+        kwRenderDetail();
+        kwLoadList();
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || '操作に失敗しました', true);
+    }
+}
+
+async function kwPublish() {
+    const r = await authFetch(`/api/knowledge/${kwCurrentWf.id}/publish`, { method: 'POST' });
+    if (!r) return;
+    if (r.ok) {
+        const data = await r.json();
+        kwShowMsg(`✅ RAGに公開しました (${data.chunks} チャンク)`, false);
+        const r2 = await authFetch(`/api/knowledge/${kwCurrentWf.id}`);
+        if (r2 && r2.ok) kwCurrentWf = await r2.json();
+        kwRenderDetail();
+        kwLoadList();
+        loadData(); // Refresh doc list
+    } else {
+        const e = await r.json();
+        kwShowMsg(e.detail || '公開に失敗しました', true);
+    }
+}
+
+function kwCloseModal() {
+    document.getElementById('kw-modal').classList.add('hidden');
+    kwCurrentWf = null;
+}
+
+document.getElementById('kw-modal').addEventListener('click', function(e) {
+    if (e.target === this) kwCloseModal();
+});
 
 // ---------- Init ----------
 checkAuth();

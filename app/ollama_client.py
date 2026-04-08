@@ -234,3 +234,74 @@ async def chat_completion_vision_stream(
                     yield token
                 if data.get("done"):
                     break
+
+
+_SUMMARIZE_SYSTEM = (
+    "あなたはインタビュー記録を整理・要約する専門家です。\n"
+    "以下のインタビュー記録（質問と回答のペア）を読み、次の2つを生成してください。\n\n"
+    "## 出力形式\n"
+    "必ず以下のJSON形式で出力してください。JSON以外のテキストは不要です。\n"
+    "```json\n"
+    '{\n'
+    '  "summary": "インタビュー内容の要約（200-400字）",\n'
+    '  "faq": [\n'
+    '    {"q": "質問文", "a": "回答文"},\n'
+    '    {"q": "質問文", "a": "回答文"}\n'
+    '  ]\n'
+    '}\n'
+    "```\n\n"
+    "## ルール\n"
+    "- FAQは5～15件程度を目安に生成\n"
+    "- 口語的な表現は丁寧な文語体に変換\n"
+    "- 曖昧な表現は明確化し、具体的な数値や手順を保持\n"
+    "- 業務ノウハウの本質を失わないこと\n"
+    "- 出力はJSON以外含めないこと\n"
+)
+
+
+async def generate_summary_and_faq(
+    interview_data: list[dict],
+    title: str = "",
+    model: str = "",
+) -> dict:
+    """インタビューデータからLLMで要約とFAQを生成する。
+
+    Args:
+        interview_data: [{"q": "質問", "a": "回答"}, ...]
+        title: ワークフローのタイトル（コンテキスト用）
+
+    Returns:
+        {"summary": "...", "faq": [{"q": "...", "a": "..."}, ...]}
+    """
+    qa_text = "\n\n".join(
+        f"質問: {item.get('q', '')}\n回答: {item.get('a', '')}"
+        for item in interview_data
+    )
+    prompt = f"テーマ: {title}\n\n## インタビュー記録\n{qa_text}"
+    messages = [
+        {"role": "system", "content": _SUMMARIZE_SYSTEM},
+        {"role": "user", "content": prompt},
+    ]
+    use_model = model or CHAT_MODEL
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        resp = await client.post(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            json={"model": use_model, "messages": messages, "stream": False},
+        )
+        resp.raise_for_status()
+        content = resp.json()["message"]["content"]
+
+    # JSONを抽出（```json ... ``` やプレーンJSON対応）
+    import re
+    json_match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
+    if json_match:
+        content = json_match.group(1)
+    try:
+        result = json.loads(content)
+    except json.JSONDecodeError:
+        result = {"summary": content, "faq": []}
+    if "summary" not in result:
+        result["summary"] = content
+    if "faq" not in result:
+        result["faq"] = []
+    return result
