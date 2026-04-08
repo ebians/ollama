@@ -34,17 +34,53 @@ def _get_ext(filename: str) -> str:
 
 
 def _extract_pdf(data: bytes) -> str:
-    """PDFからテキストを抽出する（テキストが少ない場合OCRにフォールバック）"""
+    """PDFからテキストを抽出する（表はMarkdown形式で保持、テキストが少ない場合OCRにフォールバック）"""
     doc = fitz.open(stream=data, filetype="pdf")
     pages: list[str] = []
-    for page in doc:
+    for page_num, page in enumerate(doc, 1):
+        parts: list[str] = [f"<!-- page:{page_num} -->"]
         text = page.get_text().strip()
         if len(text) < 20:
-            # テキストが少ない → 画像として OCR
             text = _ocr_page(page)
-        pages.append(text)
+        # 表を検出してMarkdown形式に変換
+        tables_md = _extract_tables_from_page(page)
+        if tables_md:
+            parts.append(text)
+            parts.extend(tables_md)
+        else:
+            parts.append(text)
+        pages.append("\n\n".join(parts))
     doc.close()
-    return "\n".join(pages)
+    return "\n\n".join(pages)
+
+
+def _extract_tables_from_page(page) -> list[str]:
+    """PDFページから表を検出し、Markdown表形式のリストとして返す"""
+    try:
+        tables = page.find_tables()
+        if not tables or len(tables.tables) == 0:
+            return []
+        result: list[str] = []
+        for table in tables:
+            rows = table.extract()
+            if not rows or len(rows) < 2:
+                continue
+            md_rows: list[str] = []
+            # ヘッダー行
+            header = [str(c).strip() if c else "" for c in rows[0]]
+            md_rows.append("| " + " | ".join(header) + " |")
+            md_rows.append("| " + " | ".join(["---"] * len(header)) + " |")
+            # データ行
+            for row in rows[1:]:
+                cells = [str(c).strip() if c else "" for c in row]
+                # 列数をヘッダーに揃える
+                while len(cells) < len(header):
+                    cells.append("")
+                md_rows.append("| " + " | ".join(cells[:len(header)]) + " |")
+            result.append("\n".join(md_rows))
+        return result
+    except Exception:
+        return []
 
 
 def _ocr_page(page) -> str:
@@ -59,13 +95,28 @@ def _ocr_page(page) -> str:
 
 
 def _extract_docx(data: bytes) -> str:
-    """Word(.docx)からテキストを抽出する"""
+    """Word(.docx)からテキストを抽出する（表はMarkdown形式で保持）"""
     doc = Document(io.BytesIO(data))
-    paragraphs: list[str] = []
+    parts: list[str] = []
     for para in doc.paragraphs:
         if para.text.strip():
-            paragraphs.append(para.text)
-    return "\n".join(paragraphs)
+            parts.append(para.text)
+    # 表を抽出してMarkdown形式に変換
+    for table in doc.tables:
+        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+        if len(rows) < 2:
+            continue
+        md_rows: list[str] = []
+        header = rows[0]
+        md_rows.append("| " + " | ".join(header) + " |")
+        md_rows.append("| " + " | ".join(["---"] * len(header)) + " |")
+        for row in rows[1:]:
+            cells = row
+            while len(cells) < len(header):
+                cells.append("")
+            md_rows.append("| " + " | ".join(cells[:len(header)]) + " |")
+        parts.append("\n".join(md_rows))
+    return "\n\n".join(parts)
 
 
 def _extract_xlsx(data: bytes) -> str:

@@ -101,3 +101,47 @@ class TestExtractXlsx:
         assert "テストシート" in result
         assert "田中" in result
         assert "開発部" in result
+
+
+class TestDocxTableExtraction:
+    def test_docx_with_table(self):
+        """Word文書の表がMarkdown形式で抽出される"""
+        from docx import Document
+        import io
+        doc = Document()
+        doc.add_paragraph("レポート概要")
+        table = doc.add_table(rows=3, cols=2)
+        table.cell(0, 0).text = "項目"
+        table.cell(0, 1).text = "金額"
+        table.cell(1, 0).text = "売上"
+        table.cell(1, 1).text = "100万円"
+        table.cell(2, 0).text = "利益"
+        table.cell(2, 1).text = "20万円"
+        buf = io.BytesIO()
+        doc.save(buf)
+
+        result = extract_text("report.docx", buf.getvalue())
+        assert "レポート概要" in result
+        assert "| 項目 | 金額 |" in result
+        assert "| 売上 | 100万円 |" in result
+        assert "| 利益 | 20万円 |" in result
+        assert "| --- | --- |" in result
+
+
+class TestPdfPageComment:
+    def test_pdf_has_page_comment(self):
+        """PDFテキスト抽出にページ番号コメントが含まれる"""
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Page 1 content", fontsize=12)
+        page2 = doc.new_page()
+        page2.insert_text((50, 50), "Page 2 content", fontsize=12)
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        result = extract_text("test.pdf", pdf_bytes)
+        assert "<!-- page:1 -->" in result
+        assert "<!-- page:2 -->" in result
+        assert "Page 1 content" in result
+        assert "Page 2 content" in result

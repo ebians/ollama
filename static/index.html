@@ -283,6 +283,7 @@
         <div class="mode-selector">
             <button class="mode-btn active" data-mode="rag" onclick="setMode('rag', this)">📄 RAGモード</button>
             <button class="mode-btn" data-mode="hybrid" onclick="setMode('hybrid', this)">🔀 ハイブリッド</button>
+            <button class="mode-btn" data-mode="stepwise" onclick="setMode('stepwise', this)">🧠 段階的推論</button>
             <button class="mode-btn" data-mode="free" onclick="setMode('free', this)">💭 フリーチャット</button>
         </div>
         <div class="model-row">
@@ -463,6 +464,7 @@ function setMode(mode, btn) {
     const placeholders = {
         rag: '社内ドキュメントについて質問...',
         hybrid: '社内文書 + 一般知識で回答...',
+        stepwise: '複雑文書を段階的に分析して回答...',
         free: '何でも質問してください...'
     };
     questionInput.placeholder = placeholders[mode] || placeholders.rag;

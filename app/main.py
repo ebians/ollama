@@ -65,7 +65,7 @@ class LoginRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
     history: list[dict] = []
-    mode: str = "rag"  # "rag" | "hybrid" | "free"
+    mode: str = "rag"  # "rag" | "hybrid" | "free" | "stepwise"
     session_id: str = ""  # 空なら新規セッション
     model: str = ""  # 空ならデフォルトモデル
 
@@ -219,7 +219,7 @@ async def ask_question(req: AskRequest):
     """質問に対して回答する（モード対応）"""
     hits = []
     context = None
-    if req.mode in ("rag", "hybrid"):
+    if req.mode in ("rag", "hybrid", "stepwise"):
         hits = await search(req.question)
         if not hits and req.mode == "rag":
             return AskResponse(answer="ドキュメントが登録されていません。先にファイルをアップロードしてください。", sources=[])
@@ -247,7 +247,7 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
 
     hits = []
     context = None
-    if req.mode in ("rag", "hybrid"):
+    if req.mode in ("rag", "hybrid", "stepwise"):
         hits = await search(req.question)
         if not hits and req.mode == "rag":
             no_doc_msg = "ドキュメントが登録されていません。先にファイルをアップロードしてください。"

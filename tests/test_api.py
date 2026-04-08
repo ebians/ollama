@@ -113,6 +113,17 @@ class TestAsk:
         assert data["answer"] == "フリー回答です"
         assert data["sources"] == []
 
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="段階的に分析した回答です")
+    @patch("app.main.search", new_callable=AsyncMock, return_value=[
+        {"text": "売上は前年比10%増", "source": "report.pdf", "distance": 0.12}
+    ])
+    async def test_ask_stepwise(self, mock_search, mock_chat, client):
+        r = await client.post("/api/ask", json={"question": "業績を分析して", "mode": "stepwise"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["answer"] == "段階的に分析した回答です"
+        assert len(data["sources"]) == 1
+
 
 class TestSessions:
     async def test_list_sessions(self, client, as_anonymous):

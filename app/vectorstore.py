@@ -12,6 +12,9 @@ _collection = _client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"},
 )
 
+# ページ番号コメントのパターン
+_PAGE_COMMENT = re.compile(r"<!--\s*page:(\d+)\s*-->")
+
 # 見出し・段落区切りのパターン（Markdown見出し、番号付き見出し、空行2つ以上）
 _SPLIT_PATTERN = re.compile(
     r"(?=^#{1,3}\s)"        # Markdown 見出し (# / ## / ###)
@@ -66,11 +69,22 @@ async def add_document(doc_id: str, filename: str, text: str) -> int:
 
     for i, chunk in enumerate(chunks):
         chunk_id = f"{doc_id}_chunk{i}"
-        embedding = await get_embedding(chunk)
+        # チャンクからページ番号を抽出
+        page_match = _PAGE_COMMENT.search(chunk)
+        page_num = int(page_match.group(1)) if page_match else 0
+        # ページコメントを除去してembedding
+        clean_chunk = _PAGE_COMMENT.sub("", chunk).strip()
+        embedding = await get_embedding(clean_chunk)
         ids.append(chunk_id)
         embeddings.append(embedding)
-        documents.append(chunk)
-        metadatas.append({"source": filename, "chunk_index": i})
+        documents.append(clean_chunk)
+        meta = {"source": filename, "chunk_index": i}
+        if page_num:
+            meta["page"] = page_num
+        # 表を含むかどうかのフラグ
+        if "| --- |" in chunk or "|---|" in chunk:
+            meta["has_table"] = True
+        metadatas.append(meta)
 
     _collection.add(
         ids=ids,
@@ -96,7 +110,12 @@ async def search(query: str) -> list[dict]:
         results["metadatas"][0],
         results["distances"][0],
     ):
-        hits.append({"text": doc, "source": meta["source"], "distance": round(dist, 4)})
+        hit = {"text": doc, "source": meta["source"], "distance": round(dist, 4)}
+        if meta.get("page"):
+            hit["page"] = meta["page"]
+        if meta.get("has_table"):
+            hit["has_table"] = True
+        hits.append(hit)
     return hits
 
 
