@@ -427,3 +427,129 @@ class TestAutoMode:
             r = await client.post("/api/ask", json={"question": "hello", "mode": "free"})
             assert r.status_code == 200
             mock_classify.assert_not_called()
+
+
+class TestUploadMode:
+    @patch("app.main.chat_completion", new_callable=AsyncMock, return_value="ドキュメントの内容は...")
+    async def test_ask_upload_mode(self, mock_chat, client):
+        r = await client.post("/api/ask", json={
+            "question": "このドキュメントの要点は？",
+            "mode": "upload",
+            "temp_context": "これはテスト用のドキュメントです。重要な点が3つあります。",
+        })
+        assert r.status_code == 200
+        data = r.json()
+        assert data["answer"] == "ドキュメントの内容は..."
+        assert data["sources"] == []
+        # contextが渡されていることを確認
+        mock_chat.assert_called_once()
+        call_args = mock_chat.call_args
+        assert call_args[0][1] == "これはテスト用のドキュメントです。重要な点が3つあります。"
+
+    async def test_upload_temp_as_user(self, client, as_user):
+        r = await client.post("/api/upload-temp", files={"file": ("test.txt", b"hello world text")})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["filename"] == "test.txt"
+        assert data["text"] == "hello world text"
+        assert data["length"] == 16
+
+    async def test_upload_temp_unsupported_ext(self, client, as_user):
+        r = await client.post("/api/upload-temp", files={"file": ("test.exe", b"binary")})
+        assert r.status_code == 400
+
+    async def test_upload_temp_no_auth(self, client):
+        r = await client.post("/api/upload-temp", files={"file": ("test.txt", b"hello")})
+        assert r.status_code == 401
+
+    async def test_upload_temp_empty_file(self, client, as_user):
+        r = await client.post("/api/upload-temp", files={"file": ("test.txt", b"")})
+        assert r.status_code == 400
+
+
+class TestKnowledgeUserAccess:
+    """ナレッジ形式知化のユーザー権限テスト"""
+
+    async def test_create_as_user(self, client, as_user):
+        """一般ユーザーがワークフロー作成できる"""
+        r = await client.post("/api/knowledge", json={"title": "テスト"})
+        assert r.status_code == 200
+        assert "id" in r.json()
+
+    async def test_create_no_auth(self, client):
+        """未認証ではワークフロー作成不可"""
+        r = await client.post("/api/knowledge", json={"title": "テスト"})
+        assert r.status_code == 401
+
+    async def test_list_as_user(self, client, as_user):
+        """一般ユーザーがワークフロー一覧を取得できる"""
+        r = await client.get("/api/knowledge")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    async def test_stats_admin_only(self, client, as_user):
+        """統計は管理者のみ"""
+        r = await client.get("/api/knowledge/stats")
+        assert r.status_code == 403
+
+    async def test_stats_as_admin(self, client, as_admin):
+        """管理者は統計取得可"""
+        r = await client.get("/api/knowledge/stats")
+        assert r.status_code == 200
+
+    async def test_get_own_workflow(self, client, as_user):
+        """自分のワークフローを取得できる"""
+        r = await client.post("/api/knowledge", json={"title": "マイナレッジ"})
+        wf_id = r.json()["id"]
+        r = await client.get(f"/api/knowledge/{wf_id}")
+        assert r.status_code == 200
+        assert r.json()["title"] == "マイナレッジ"
+
+    async def test_get_others_workflow_forbidden(self, client, as_user):
+        """他人のワークフローは取得不可"""
+        from app.knowledge_store import create_workflow
+        wf_id = create_workflow("他人のナレッジ", interviewer_id="other_user")
+        r = await client.get(f"/api/knowledge/{wf_id}")
+        assert r.status_code == 403
+
+    async def test_update_own_interview(self, client, as_user):
+        """自分のワークフローのインタビューデータを更新できる"""
+        r = await client.post("/api/knowledge", json={"title": "テスト"})
+        wf_id = r.json()["id"]
+        r = await client.put(f"/api/knowledge/{wf_id}/interview", json={
+            "interview_data": [{"q": "質問", "a": "回答"}],
+        })
+        assert r.status_code == 200
+
+    async def test_update_others_interview_forbidden(self, client, as_user):
+        """他人のワークフローのインタビューデータは更新不可"""
+        from app.knowledge_store import create_workflow
+        wf_id = create_workflow("他人のナレッジ", interviewer_id="other_user")
+        r = await client.put(f"/api/knowledge/{wf_id}/interview", json={
+            "interview_data": [{"q": "Q", "a": "A"}],
+        })
+        assert r.status_code == 403
+
+    async def test_delete_own_draft(self, client, as_user):
+        """自分のdraftは削除可"""
+        r = await client.post("/api/knowledge", json={"title": "削除用"})
+        wf_id = r.json()["id"]
+        r = await client.delete(f"/api/knowledge/{wf_id}")
+        assert r.status_code == 200
+
+    async def test_delete_others_forbidden(self, client, as_user):
+        """他人のワークフローは削除不可"""
+        from app.knowledge_store import create_workflow
+        wf_id = create_workflow("他人", interviewer_id="other_user")
+        r = await client.delete(f"/api/knowledge/{wf_id}")
+        assert r.status_code == 403
+
+    async def test_review_admin_only(self, client, as_user):
+        """レビュー操作は管理者のみ"""
+        r = await client.post("/api/knowledge/fake_id/review", json={"action": "approve"})
+        assert r.status_code == 403
+
+    async def test_publish_admin_only(self, client, as_user):
+        """公開操作は管理者のみ"""
+        r = await client.post("/api/knowledge/fake_id/publish")
+        assert r.status_code == 403

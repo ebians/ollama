@@ -66,10 +66,11 @@ class LoginRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
     history: list[dict] = []
-    mode: str = "auto"  # "auto" | "rag" | "hybrid" | "free" | "stepwise" | "multimodal" | "calculate" | "consistency"
+    mode: str = "auto"  # "auto" | "rag" | "hybrid" | "free" | "stepwise" | "multimodal" | "calculate" | "consistency" | "upload"
     session_id: str = ""  # 空なら新規セッション
     model: str = ""  # 空ならデフォルトモデル
     doc_filter: list[str] = []  # 整合性チェック用: 対象ドキュメント名リスト
+    temp_context: str = ""  # 一時ドキュメントモード用: アップロードファイルのテキスト
 
 
 class AskResponse(BaseModel):
@@ -195,6 +196,23 @@ async def upload_document(file: UploadFile = File(...), _admin: dict = Depends(r
     return {"doc_id": doc_id, "filename": filename, "chunks": num_chunks, "page_images": page_images_count}
 
 
+@app.post("/api/upload-temp")
+async def upload_temp_document(file: UploadFile = File(...), _user: dict = Depends(require_user)):
+    """一時ドキュメントアップロード（テキスト抽出のみ、ベクトルDB登録なし）"""
+    filename = file.filename or "unknown"
+    ext = ("." + filename.rsplit(".", 1)[-1]).lower() if "." in filename else ""
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"未対応の形式です。対応形式: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
+        )
+    content = await file.read()
+    text = extract_text(filename, content)
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="ファイルからテキストを抽出できませんでした")
+    return {"filename": filename, "text": text, "length": len(text)}
+
+
 @app.get("/api/documents")
 async def get_documents(_admin: dict = Depends(require_admin_user)):
     """登録済みドキュメント一覧を返す（管理者専用）"""
@@ -235,7 +253,9 @@ async def ask_question(req: AskRequest):
         resolved_mode = await classify_intent(req.question, req.model)
     hits = []
     context = None
-    if resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
+    if resolved_mode == "upload" and req.temp_context:
+        context = req.temp_context
+    elif resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
         if not hits and resolved_mode == "rag":
             return AskResponse(answer="ドキュメントが登録されていません。先にファイルをアップロードしてください。", sources=[])
@@ -270,7 +290,11 @@ async def ask_question_stream(req: AskRequest, user: dict | None = Depends(get_c
     context = None
     structured = None
     images_b64 = []
-    if resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
+
+    # 一時ドキュメントモード: アップロードテキストをコンテキストとして使用
+    if resolved_mode == "upload" and req.temp_context:
+        context = req.temp_context
+    elif resolved_mode in ("rag", "hybrid", "stepwise", "multimodal", "calculate", "consistency"):
         hits = await search(req.question)
         if not hits and resolved_mode == "rag":
             no_doc_msg = "ドキュメントが登録されていません。先にファイルをアップロードしてください。"
@@ -460,7 +484,9 @@ async def api_consistency_check(req: ConsistencyCheckRequest, _admin: dict = Dep
     return {"summary": result.summary, "issues": issues}
 
 
-# ---------- 暗黙知ワークフロー API（管理者のみ）----------
+# ---------- 暗黙知ワークフロー API ----------
+# ユーザー: 自分のワークフローの作成・編集・レビュー依頼まで
+# 管理者: 全ワークフロー閲覧・レビュー承認/差し戻し・RAG公開・削除
 
 from app.knowledge_store import (
     create_workflow, get_workflow, list_workflows, update_interview_data,
@@ -492,30 +518,39 @@ async def api_knowledge_stats(_admin: dict = Depends(require_admin_user)):
 
 
 @app.get("/api/knowledge")
-async def api_list_workflows(stage: str = "", _admin: dict = Depends(require_admin_user)):
-    """ワークフロー一覧"""
-    return list_workflows(stage)
+async def api_list_workflows(stage: str = "", user: dict = Depends(require_user)):
+    """ワークフロー一覧（管理者は全件、一般ユーザーは自分のみ）"""
+    if user.get("is_admin"):
+        return list_workflows(stage)
+    return list_workflows(stage, user_id=user["id"])
 
 
 @app.post("/api/knowledge")
-async def api_create_workflow(req: CreateWorkflowRequest, admin: dict = Depends(require_admin_user)):
+async def api_create_workflow(req: CreateWorkflowRequest, user: dict = Depends(require_user)):
     """新規ワークフロー作成"""
-    wf_id = create_workflow(req.title, req.category, req.interviewee, admin["id"])
+    wf_id = create_workflow(req.title, req.category, req.interviewee, user["id"])
     return {"id": wf_id}
 
 
 @app.get("/api/knowledge/{wf_id}")
-async def api_get_workflow(wf_id: str, _admin: dict = Depends(require_admin_user)):
-    """ワークフロー詳細"""
+async def api_get_workflow(wf_id: str, user: dict = Depends(require_user)):
+    """ワークフロー詳細（管理者は全件、一般ユーザーは自分のみ）"""
     wf = get_workflow(wf_id)
     if not wf:
         raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not user.get("is_admin") and wf["interviewer_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="他のユーザーのワークフローは閲覧できません")
     return wf
 
 
 @app.put("/api/knowledge/{wf_id}/interview")
-async def api_update_interview(wf_id: str, req: InterviewDataRequest, _admin: dict = Depends(require_admin_user)):
-    """インタビューデータ保存"""
+async def api_update_interview(wf_id: str, req: InterviewDataRequest, user: dict = Depends(require_user)):
+    """インタビューデータ保存（所有者のみ）"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not user.get("is_admin") and wf["interviewer_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="他のユーザーのワークフローは編集できません")
     ok = update_interview_data(wf_id, req.interview_data)
     if not ok:
         raise HTTPException(status_code=400, detail="draftステージのワークフローのみ編集できます")
@@ -523,11 +558,13 @@ async def api_update_interview(wf_id: str, req: InterviewDataRequest, _admin: di
 
 
 @app.post("/api/knowledge/{wf_id}/summarize")
-async def api_generate_summary(wf_id: str, req: GenerateSummaryRequest, _admin: dict = Depends(require_admin_user)):
-    """LLMで要約・FAQ生成"""
+async def api_generate_summary(wf_id: str, req: GenerateSummaryRequest, user: dict = Depends(require_user)):
+    """LLMで要約・FAQ生成（所有者のみ）"""
     wf = get_workflow(wf_id)
     if not wf:
         raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not user.get("is_admin") and wf["interviewer_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="他のユーザーのワークフローは操作できません")
     if not wf["interview_data"]:
         raise HTTPException(status_code=400, detail="インタビューデータが空です")
     result = await generate_summary_and_faq(wf["interview_data"], wf["title"], req.model)
@@ -536,8 +573,13 @@ async def api_generate_summary(wf_id: str, req: GenerateSummaryRequest, _admin: 
 
 
 @app.post("/api/knowledge/{wf_id}/submit-review")
-async def api_submit_review(wf_id: str, _admin: dict = Depends(require_admin_user)):
-    """レビュー依頼"""
+async def api_submit_review(wf_id: str, user: dict = Depends(require_user)):
+    """レビュー依頼（所有者のみ）"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not user.get("is_admin") and wf["interviewer_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="他のユーザーのワークフローは操作できません")
     ok = submit_for_review(wf_id)
     if not ok:
         raise HTTPException(status_code=400, detail="summaryステージのワークフローのみレビュー依頼できます")
@@ -592,8 +634,16 @@ async def api_publish_workflow(wf_id: str, _admin: dict = Depends(require_admin_
 
 
 @app.delete("/api/knowledge/{wf_id}")
-async def api_delete_workflow(wf_id: str, _admin: dict = Depends(require_admin_user)):
-    """ワークフロー削除"""
+async def api_delete_workflow(wf_id: str, user: dict = Depends(require_user)):
+    """ワークフロー削除（管理者は全件、一般ユーザーは自分のdraft/summaryのみ）"""
+    wf = get_workflow(wf_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="ワークフローが見つかりません")
+    if not user.get("is_admin"):
+        if wf["interviewer_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="他のユーザーのワークフローは削除できません")
+        if wf["stage"] not in ("draft", "summary"):
+            raise HTTPException(status_code=400, detail="レビュー中・公開済みのワークフローは管理者のみ削除できます")
     ok = delete_workflow(wf_id)
     if not ok:
         raise HTTPException(status_code=404, detail="ワークフローが見つかりません")

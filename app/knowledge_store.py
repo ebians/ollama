@@ -91,18 +91,22 @@ def get_workflow(wf_id: str) -> dict | None:
     return _row_to_dict(row) if row else None
 
 
-def list_workflows(stage: str = "") -> list[dict]:
-    """ワークフロー一覧（新しい順、stage指定可）"""
+def list_workflows(stage: str = "", user_id: str = "") -> list[dict]:
+    """ワークフロー一覧（新しい順、stage/user_id指定可）"""
     conn = _get_conn()
+    conditions: list[str] = []
+    params: list[str] = []
     if stage:
-        rows = conn.execute(
-            "SELECT * FROM knowledge_workflows WHERE stage = ? ORDER BY updated_at DESC",
-            (stage,),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM knowledge_workflows ORDER BY updated_at DESC"
-        ).fetchall()
+        conditions.append("stage = ?")
+        params.append(stage)
+    if user_id:
+        conditions.append("interviewer_id = ?")
+        params.append(user_id)
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    rows = conn.execute(
+        f"SELECT * FROM knowledge_workflows{where} ORDER BY updated_at DESC",
+        params,
+    ).fetchall()
     conn.close()
     return [_row_to_dict(r) for r in rows]
 

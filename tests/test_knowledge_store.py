@@ -74,6 +74,25 @@ class TestListWorkflows:
         wfs = ks.list_workflows()
         assert wfs[0]["id"] == id2  # newer first
 
+    def test_filter_by_user_id(self, tmp_db):
+        ks = tmp_db
+        ks.create_workflow("User A's", interviewer_id="userA")
+        ks.create_workflow("User B's", interviewer_id="userB")
+        ks.create_workflow("User A's 2", interviewer_id="userA")
+        assert len(ks.list_workflows(user_id="userA")) == 2
+        assert len(ks.list_workflows(user_id="userB")) == 1
+        assert len(ks.list_workflows(user_id="userC")) == 0
+
+    def test_filter_by_stage_and_user_id(self, tmp_db):
+        ks = tmp_db
+        id1 = ks.create_workflow("A", interviewer_id="u1")
+        id2 = ks.create_workflow("B", interviewer_id="u1")
+        ks.create_workflow("C", interviewer_id="u2")
+        ks.save_summary(id1, "要約", [{"q": "Q", "a": "A"}])
+        assert len(ks.list_workflows(stage="draft", user_id="u1")) == 1
+        assert len(ks.list_workflows(stage="summary", user_id="u1")) == 1
+        assert len(ks.list_workflows(user_id="u1")) == 2
+
 
 class TestUpdateInterviewData:
     def test_saves_qa_pairs(self, tmp_db):

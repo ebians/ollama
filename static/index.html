@@ -129,6 +129,24 @@
             padding: 2px 10px; background: #f1f5f9; border-radius: 12px;
         }
 
+        /* Upload area */
+        .upload-area {
+            display: none; padding: 12px; margin-bottom: 12px; border: 2px dashed #d1d5db;
+            border-radius: 8px; text-align: center; font-size: 0.88rem; color: #64748b;
+            transition: border-color 0.2s;
+        }
+        .upload-area.visible { display: block; }
+        .upload-area.has-file { border-color: #22c55e; background: #f0fdf4; }
+        .upload-area .upload-info { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .upload-area .upload-filename { font-weight: 600; color: #065f46; }
+        .upload-area .upload-clear {
+            background: none; border: none; color: #ef4444; cursor: pointer;
+            font-size: 0.8rem; text-decoration: underline; padding: 0;
+        }
+        [data-theme="dark"] .upload-area { border-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .upload-area.has-file { border-color: #22c55e; background: rgba(34,197,94,0.1); }
+        [data-theme="dark"] .upload-area .upload-filename { color: #86efac; }
+
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #93c5fd; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -211,6 +229,78 @@
         }
         .theme-toggle:hover { background: rgba(255,255,255,0.3); }
         .btn-cancel { background: #e2e8f0; color: #374151; border: none; cursor: pointer; }
+
+        /* Knowledge workflow section */
+        .knowledge-section { margin-bottom: 20px; }
+        .knowledge-toggle {
+            display: flex; align-items: center; gap: 8px; cursor: pointer;
+            padding: 14px 20px; background: #fff; border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 0;
+            border: none; width: 100%; text-align: left; font-size: 1.05rem;
+            font-weight: 600; color: #374151; transition: background 0.15s;
+        }
+        .knowledge-toggle:hover { background: #f8fafc; }
+        .knowledge-body { display: none; }
+        .knowledge-body.open { display: block; margin-top: 8px; }
+        .knowledge-body .card { margin-bottom: 12px; }
+        .kw-create-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .kw-create-row input { flex: 1; min-width: 120px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; outline: none; }
+        .kw-create-row input:focus { border-color: #2563eb; }
+        .kw-list { display: flex; flex-direction: column; gap: 8px; }
+        .kw-item {
+            padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 8px;
+            cursor: pointer; transition: background 0.15s; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .kw-item:hover { background: #f8fafc; }
+        .kw-item-info { flex: 1; min-width: 0; }
+        .kw-item-title { font-weight: 600; font-size: 0.95rem; color: #1e293b; }
+        .kw-item-meta { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+        .kw-stage {
+            display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;
+            font-weight: 600; flex-shrink: 0; margin-left: 8px;
+        }
+        .kw-stage.draft { background: #fef3c7; color: #92400e; }
+        .kw-stage.summary { background: #dbeafe; color: #1e40af; }
+        .kw-stage.review { background: #fce7f3; color: #9d174d; }
+        .kw-stage.published { background: #d1fae5; color: #065f46; }
+        /* Knowledge detail modal */
+        .kw-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .kw-overlay.hidden { display: none; }
+        .kw-modal {
+            background: #fff; border-radius: 16px; padding: 28px; width: 600px; max-width: 95vw;
+            max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .kw-modal h3 { font-size: 1.1rem; margin-bottom: 16px; color: #1e293b; }
+        .kw-qa-pair { margin-bottom: 12px; padding: 10px; background: #f8fafc; border-radius: 8px; }
+        .kw-qa-pair label { display: block; font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+        .kw-qa-pair textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; resize: vertical; min-height: 50px; outline: none; font-family: inherit; }
+        .kw-qa-pair textarea:focus { border-color: #2563eb; }
+        .kw-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .kw-actions button { padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: none; cursor: pointer; }
+        .kw-summary-box { margin-top: 12px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; }
+        .kw-faq-list { margin-top: 12px; }
+        .kw-faq-item { padding: 10px; margin-bottom: 8px; background: #f8fafc; border-radius: 6px; }
+        .kw-faq-item .q { font-weight: 600; color: #1e40af; margin-bottom: 4px; font-size: 0.9rem; }
+        .kw-faq-item .a { font-size: 0.88rem; color: #374151; line-height: 1.5; }
+
+        [data-theme="dark"] .knowledge-toggle { background: #1e293b; color: #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        [data-theme="dark"] .knowledge-toggle:hover { background: #334155; }
+        [data-theme="dark"] .kw-item { border-color: #334155; }
+        [data-theme="dark"] .kw-item:hover { background: #334155; }
+        [data-theme="dark"] .kw-item-title { color: #e2e8f0; }
+        [data-theme="dark"] .kw-item-meta { color: #94a3b8; }
+        [data-theme="dark"] .kw-create-row input { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .kw-modal { background: #1e293b; }
+        [data-theme="dark"] .kw-modal h3 { color: #e2e8f0; }
+        [data-theme="dark"] .kw-qa-pair { background: #0f172a; }
+        [data-theme="dark"] .kw-qa-pair label { color: #94a3b8; }
+        [data-theme="dark"] .kw-qa-pair textarea { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+        [data-theme="dark"] .kw-summary-box { background: rgba(37,99,235,0.15); color: #e2e8f0; }
+        [data-theme="dark"] .kw-faq-item { background: #0f172a; }
+        [data-theme="dark"] .kw-faq-item .q { color: #60a5fa; }
+        [data-theme="dark"] .kw-faq-item .a { color: #cbd5e1; }
+        [data-theme="dark"] .kw-overlay { background: rgba(0,0,0,0.7); }
 
         /* Dark Mode */
         [data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
@@ -306,6 +396,19 @@
             <button class="mode-btn" data-mode="multimodal" onclick="setMode('multimodal', this)">🖼️ 図表読取</button>
             <button class="mode-btn" data-mode="calculate" onclick="setMode('calculate', this)">🔢 数値計算</button>
             <button class="mode-btn" data-mode="consistency" onclick="setMode('consistency', this)">⚖️ 整合性</button>
+            <button class="mode-btn" data-mode="upload" onclick="setMode('upload', this)">📎 文書Q&A</button>
+        </div>
+        <div class="upload-area" id="upload-area">
+            <div id="upload-placeholder">
+                📎 ファイルをアップロードして質問できます（.txt, .pdf, .docx, .xlsx）<br>
+                <input type="file" id="upload-file" accept=".txt,.pdf,.docx,.xlsx" style="margin-top:8px">
+            </div>
+            <div id="upload-info" class="upload-info" style="display:none">
+                <span>📄</span>
+                <span class="upload-filename" id="upload-filename"></span>
+                <span id="upload-length" style="font-size:0.8rem;color:#64748b"></span>
+                <button class="upload-clear" onclick="clearUpload()">✕ クリア</button>
+            </div>
         </div>
         <div class="model-row">
             <label for="model-select">🤖 モデル:</label>
@@ -315,6 +418,41 @@
         <div class="input-row">
             <input type="text" id="question" placeholder="社内ドキュメントについて質問..." autocomplete="off">
             <button class="btn-primary" id="ask-btn" onclick="ask()">送信</button>
+        </div>
+    </div>
+
+    <!-- Knowledge Workflow Section -->
+    <div class="knowledge-section" id="knowledge-section" style="display:none">
+        <button class="knowledge-toggle" onclick="toggleKnowledge()">
+            <span id="kw-toggle-icon">▶</span> 📝 ナレッジ形式知化
+        </button>
+        <div class="knowledge-body" id="knowledge-body">
+            <div class="card">
+                <h2>新規ワークフロー作成</h2>
+                <div class="kw-create-row">
+                    <input type="text" id="kw-title" placeholder="タイトル（必須）">
+                    <input type="text" id="kw-category" placeholder="カテゴリ">
+                    <input type="text" id="kw-interviewee" placeholder="ナレッジ提供者">
+                    <button class="btn-primary" style="padding:8px 16px;font-size:0.85rem" onclick="kwCreate()">作成</button>
+                </div>
+            </div>
+            <div class="card">
+                <h2>マイ ワークフロー</h2>
+                <div class="kw-list" id="kw-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Knowledge Detail Modal -->
+    <div class="kw-overlay hidden" id="kw-modal">
+        <div class="kw-modal">
+            <h3 id="kw-modal-title"></h3>
+            <div id="kw-modal-stage-info" style="margin-bottom:12px"></div>
+            <div id="kw-modal-interview"></div>
+            <div id="kw-modal-summary"></div>
+            <div id="kw-modal-faq"></div>
+            <div id="kw-modal-review-notes" style="margin-top:12px"></div>
+            <div class="kw-actions" id="kw-modal-actions"></div>
         </div>
     </div>
 
@@ -348,6 +486,8 @@ let currentMode = 'auto';
 let currentSessionId = '';  // 現在のセッションID
 let currentUser = null;
 let currentModel = '';  // 空ならデフォルト
+let tempDocText = '';   // 一時ドキュメントのテキスト
+let tempDocName = '';   // 一時ドキュメントのファイル名
 
 // Base path for subpath deployment (e.g., /myllm)
 const BASE = window.location.pathname.replace(/\/(admin)?$/, '');
@@ -385,6 +525,7 @@ function showApp() {
     if (currentUser.is_admin) {
         document.getElementById('admin-link').style.display = 'inline-block';
     }
+    document.getElementById('knowledge-section').style.display = 'block';
     loadStats();
     loadSessions();
     loadModels();
@@ -490,9 +631,17 @@ function setMode(mode, btn) {
         multimodal: 'PDF図表・画像を読み取って回答... (Vision対応モデル必要)',
         calculate: '表の数値比較・差分・集計を計算...',
         consistency: '文書間の矛盾・不一致を検出...',
+        upload: 'アップロードしたファイルについて質問...',
         free: '何でも質問してください...'
     };
     questionInput.placeholder = placeholders[mode] || placeholders.auto;
+    // Show/hide upload area
+    const uploadArea = document.getElementById('upload-area');
+    if (mode === 'upload') {
+        uploadArea.classList.add('visible');
+    } else {
+        uploadArea.classList.remove('visible');
+    }
 }
 
 function toggleModeDetail() {
@@ -504,7 +653,8 @@ function toggleModeDetail() {
 
 const MODE_LABELS = {
     rag: '📄 RAGモード', hybrid: '🔀 ハイブリッド', stepwise: '🧠 段階的推論',
-    multimodal: '🖼️ 図表読取', calculate: '🔢 数値計算', consistency: '⚖️ 整合性', free: '💭 フリーチャット'
+    multimodal: '🖼️ 図表読取', calculate: '🔢 数値計算', consistency: '⚖️ 整合性',
+    upload: '📎 文書Q&A', free: '💭 フリーチャット'
 };
 
 // ---------- Stats ----------
@@ -543,9 +693,45 @@ async function loadModels() {
 // ---------- Chat ----------
 questionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) ask(); });
 
+// ---------- Upload ----------
+document.getElementById('upload-file').addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const r = await fetch('/api/upload-temp', { method: 'POST', body: formData });
+        if (!r.ok) { const e = await r.json(); alert(e.detail || 'アップロードに失敗しました'); this.value = ''; return; }
+        const data = await r.json();
+        tempDocText = data.text;
+        tempDocName = data.filename;
+        document.getElementById('upload-filename').textContent = data.filename;
+        document.getElementById('upload-length').textContent = `(${data.length.toLocaleString()}文字)`;
+        document.getElementById('upload-placeholder').style.display = 'none';
+        document.getElementById('upload-info').style.display = 'flex';
+        document.getElementById('upload-area').classList.add('has-file');
+    } catch (e) {
+        alert('アップロードに失敗しました: ' + e.message);
+        this.value = '';
+    }
+});
+
+function clearUpload() {
+    tempDocText = '';
+    tempDocName = '';
+    document.getElementById('upload-file').value = '';
+    document.getElementById('upload-placeholder').style.display = 'block';
+    document.getElementById('upload-info').style.display = 'none';
+    document.getElementById('upload-area').classList.remove('has-file');
+}
+
 async function ask() {
     const q = questionInput.value.trim();
     if (!q) return;
+    if (currentMode === 'upload' && !tempDocText) {
+        alert('ファイルをアップロードしてください');
+        return;
+    }
     questionInput.value = '';
     appendMsg('user', q);
     askBtn.disabled = true;
@@ -553,10 +739,14 @@ async function ask() {
     loadingEl.innerHTML = '<span class="spinner"></span> 考え中...';
 
     try {
+        const body = { question: q, history: chatHistory, mode: currentMode, session_id: currentSessionId, model: currentModel };
+        if (currentMode === 'upload' && tempDocText) {
+            body.temp_context = tempDocText;
+        }
         const r = await fetch('/api/ask/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: q, history: chatHistory, mode: currentMode, session_id: currentSessionId, model: currentModel }),
+            body: JSON.stringify(body),
         });
 
         const reader = r.body.getReader();
@@ -744,6 +934,227 @@ function toggleTheme() {
         document.getElementById('theme-toggle').textContent = '☀️';
     }
 })();
+
+// ---------- Knowledge Workflow ----------
+let kwCurrentId = '';
+
+function toggleKnowledge() {
+    const body = document.getElementById('knowledge-body');
+    const icon = document.getElementById('kw-toggle-icon');
+    const isOpen = body.classList.toggle('open');
+    icon.textContent = isOpen ? '▼' : '▶';
+    if (isOpen) kwLoadList();
+}
+
+async function kwCreate() {
+    const title = document.getElementById('kw-title').value.trim();
+    if (!title) { alert('タイトルを入力してください'); return; }
+    const category = document.getElementById('kw-category').value.trim();
+    const interviewee = document.getElementById('kw-interviewee').value.trim();
+    const r = await fetch('/api/knowledge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, category, interviewee }),
+    });
+    if (r.ok) {
+        document.getElementById('kw-title').value = '';
+        document.getElementById('kw-category').value = '';
+        document.getElementById('kw-interviewee').value = '';
+        const data = await r.json();
+        kwLoadList();
+        kwOpenDetail(data.id);
+    } else {
+        const e = await r.json();
+        alert(e.detail || '作成に失敗しました');
+    }
+}
+
+const KW_STAGE_LABELS = { draft: '📝 下書き', summary: '📋 要約済', review: '🔍 レビュー中', published: '✅ 公開済' };
+
+async function kwLoadList() {
+    const list = document.getElementById('kw-list');
+    try {
+        const r = await fetch('/api/knowledge');
+        const items = await r.json();
+        if (!items.length) { list.innerHTML = '<div style="color:#94a3b8;font-size:0.9rem">ワークフローがありません</div>'; return; }
+        list.innerHTML = '';
+        for (const wf of items) {
+            const div = document.createElement('div');
+            div.className = 'kw-item';
+            div.onclick = () => kwOpenDetail(wf.id);
+            div.innerHTML = `
+                <div class="kw-item-info">
+                    <div class="kw-item-title">${escapeHtml(wf.title)}</div>
+                    <div class="kw-item-meta">${wf.category ? escapeHtml(wf.category) + ' · ' : ''}${wf.updated_at.slice(0, 10)}</div>
+                </div>
+                <span class="kw-stage ${wf.stage}">${KW_STAGE_LABELS[wf.stage] || wf.stage}</span>
+            `;
+            list.appendChild(div);
+        }
+    } catch { list.innerHTML = '<div style="color:#ef4444;font-size:0.9rem">読み込みに失敗しました</div>'; }
+}
+
+async function kwOpenDetail(wfId) {
+    kwCurrentId = wfId;
+    const r = await fetch(`/api/knowledge/${wfId}`);
+    if (!r.ok) { alert('ワークフローが見つかりません'); return; }
+    const wf = await r.json();
+    document.getElementById('kw-modal-title').textContent = wf.title;
+    document.getElementById('kw-modal-stage-info').innerHTML =
+        `<span class="kw-stage ${wf.stage}">${KW_STAGE_LABELS[wf.stage] || wf.stage}</span>` +
+        (wf.interviewee ? ` · 提供者: ${escapeHtml(wf.interviewee)}` : '') +
+        (wf.category ? ` · ${escapeHtml(wf.category)}` : '');
+
+    // Interview data
+    const interviewDiv = document.getElementById('kw-modal-interview');
+    if (wf.stage === 'draft' || wf.stage === 'summary') {
+        const pairs = wf.interview_data.length ? wf.interview_data : [{ q: '', a: '' }];
+        interviewDiv.innerHTML = '<h4 style="font-size:0.95rem;margin-bottom:8px">インタビュー記録</h4>';
+        for (let i = 0; i < pairs.length; i++) {
+            interviewDiv.innerHTML += `
+                <div class="kw-qa-pair">
+                    <label>Q${i + 1}</label>
+                    <textarea id="kw-q-${i}" ${wf.stage !== 'draft' ? 'disabled' : ''}>${escapeHtml(pairs[i].q || '')}</textarea>
+                    <label>A${i + 1}</label>
+                    <textarea id="kw-a-${i}" ${wf.stage !== 'draft' ? 'disabled' : ''}>${escapeHtml(pairs[i].a || '')}</textarea>
+                </div>
+            `;
+        }
+        if (wf.stage === 'draft') {
+            interviewDiv.innerHTML += `<button style="font-size:0.8rem;padding:4px 12px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;color:#374151" onclick="kwAddQA()">＋ Q&A追加</button>`;
+        }
+        interviewDiv.dataset.count = pairs.length;
+    } else {
+        interviewDiv.innerHTML = '';
+    }
+
+    // Summary
+    const summaryDiv = document.getElementById('kw-modal-summary');
+    if (wf.summary) {
+        summaryDiv.innerHTML = `<h4 style="font-size:0.95rem;margin:12px 0 8px">要約</h4><div class="kw-summary-box">${escapeHtml(wf.summary)}</div>`;
+    } else { summaryDiv.innerHTML = ''; }
+
+    // FAQ
+    const faqDiv = document.getElementById('kw-modal-faq');
+    if (wf.faq && wf.faq.length) {
+        let html = '<h4 style="font-size:0.95rem;margin:12px 0 8px">FAQ</h4><div class="kw-faq-list">';
+        for (const f of wf.faq) {
+            html += `<div class="kw-faq-item"><div class="q">Q. ${escapeHtml(f.q || '')}</div><div class="a">${escapeHtml(f.a || '')}</div></div>`;
+        }
+        html += '</div>';
+        faqDiv.innerHTML = html;
+    } else { faqDiv.innerHTML = ''; }
+
+    // Review notes
+    const notesDiv = document.getElementById('kw-modal-review-notes');
+    if (wf.review_notes) {
+        notesDiv.innerHTML = `<div style="padding:10px;background:#fef3c7;border-radius:8px;font-size:0.88rem"><strong>レビューコメント:</strong> ${escapeHtml(wf.review_notes)}</div>`;
+    } else { notesDiv.innerHTML = ''; }
+
+    // Actions
+    const actionsDiv = document.getElementById('kw-modal-actions');
+    let actions = '';
+    if (wf.stage === 'draft') {
+        actions += `<button class="btn-primary" style="border:none;cursor:pointer" onclick="kwSaveInterview()">💾 保存</button>`;
+        actions += `<button style="background:#7c3aed;color:#fff;cursor:pointer" onclick="kwGenerateSummary()">🤖 要約生成</button>`;
+        actions += `<button class="btn-danger" onclick="kwDelete()">🗑 削除</button>`;
+    }
+    if (wf.stage === 'summary') {
+        actions += `<button style="background:#7c3aed;color:#fff;cursor:pointer" onclick="kwGenerateSummary()">🤖 再生成</button>`;
+        actions += `<button class="btn-primary" style="border:none;cursor:pointer" onclick="kwSubmitReview()">📤 レビュー依頼</button>`;
+        actions += `<button class="btn-danger" onclick="kwDelete()">🗑 削除</button>`;
+    }
+    if (wf.stage === 'review') {
+        actions += '<span style="font-size:0.85rem;color:#64748b">管理者によるレビュー待ちです</span>';
+    }
+    if (wf.stage === 'published') {
+        actions += '<span style="font-size:0.85rem;color:#065f46">✅ 公開済み</span>';
+    }
+    actions += `<button class="btn-cancel" style="cursor:pointer" onclick="kwCloseModal()">閉じる</button>`;
+    actionsDiv.innerHTML = actions;
+
+    document.getElementById('kw-modal').classList.remove('hidden');
+}
+
+function kwCloseModal() {
+    document.getElementById('kw-modal').classList.add('hidden');
+}
+document.getElementById('kw-modal').addEventListener('click', function(e) {
+    if (e.target === this) kwCloseModal();
+});
+
+function kwAddQA() {
+    const interviewDiv = document.getElementById('kw-modal-interview');
+    const count = parseInt(interviewDiv.dataset.count || '0');
+    const newIdx = count;
+    const addBtn = interviewDiv.querySelector('button');
+    const pair = document.createElement('div');
+    pair.className = 'kw-qa-pair';
+    pair.innerHTML = `<label>Q${newIdx + 1}</label><textarea id="kw-q-${newIdx}"></textarea><label>A${newIdx + 1}</label><textarea id="kw-a-${newIdx}"></textarea>`;
+    interviewDiv.insertBefore(pair, addBtn);
+    interviewDiv.dataset.count = newIdx + 1;
+}
+
+function kwCollectQA() {
+    const interviewDiv = document.getElementById('kw-modal-interview');
+    const count = parseInt(interviewDiv.dataset.count || '0');
+    const pairs = [];
+    for (let i = 0; i < count; i++) {
+        const qEl = document.getElementById(`kw-q-${i}`);
+        const aEl = document.getElementById(`kw-a-${i}`);
+        if (qEl && aEl) {
+            const q = qEl.value.trim();
+            const a = aEl.value.trim();
+            if (q || a) pairs.push({ q, a });
+        }
+    }
+    return pairs;
+}
+
+async function kwSaveInterview() {
+    const pairs = kwCollectQA();
+    if (!pairs.length) { alert('Q&Aを1つ以上入力してください'); return; }
+    const r = await fetch(`/api/knowledge/${kwCurrentId}/interview`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview_data: pairs }),
+    });
+    if (r.ok) { alert('保存しました'); } else { const e = await r.json(); alert(e.detail || '保存に失敗しました'); }
+}
+
+async function kwGenerateSummary() {
+    // Save interview data first if in draft
+    const pairs = kwCollectQA();
+    if (pairs.length) {
+        await fetch(`/api/knowledge/${kwCurrentId}/interview`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interview_data: pairs }),
+        });
+    }
+    const actionsDiv = document.getElementById('kw-modal-actions');
+    actionsDiv.innerHTML = '<span class="spinner"></span> 要約を生成中...（しばらくお待ちください）';
+    const r = await fetch(`/api/knowledge/${kwCurrentId}/summarize`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: currentModel }),
+    });
+    if (r.ok) {
+        kwOpenDetail(kwCurrentId);
+    } else {
+        const e = await r.json();
+        alert(e.detail || '要約生成に失敗しました');
+        kwOpenDetail(kwCurrentId);
+    }
+}
+
+async function kwSubmitReview() {
+    if (!confirm('レビュー依頼を送信しますか？')) return;
+    const r = await fetch(`/api/knowledge/${kwCurrentId}/submit-review`, { method: 'POST' });
+    if (r.ok) { kwOpenDetail(kwCurrentId); kwLoadList(); } else { const e = await r.json(); alert(e.detail || '送信に失敗しました'); }
+}
+
+async function kwDelete() {
+    if (!confirm('このワークフローを削除しますか？')) return;
+    const r = await fetch(`/api/knowledge/${kwCurrentId}`, { method: 'DELETE' });
+    if (r.ok) { kwCloseModal(); kwLoadList(); } else { const e = await r.json(); alert(e.detail || '削除に失敗しました'); }
+}
 
 // ---------- Init ----------
 checkAuth();
